@@ -62,6 +62,10 @@ class AbstractRecord(models.Model):
     def get_users_with_perms(self, *args, **kwargs):
         return self.case.get_users_with_perms(*args, **kwargs)
 
+    def get_absolute_url(self):
+        case_url = self.record.case_get_absolute_url()
+        return "%s#record-%s" % (case_url, self.pk)
+
     def get_template_list(self):
         return u"%s/_%s_list.html" % (self._meta.app_label, self._meta.model_name)
 

@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+import string
+import random
 from django.contrib.auth.models import AbstractUser
 from django.db.models import Q
 from django.core.urlresolvers import reverse
+from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import Count
 from django.contrib.auth.models import UserManager
@@ -9,6 +12,7 @@ from django.utils import timezone
 from django.template.loader import render_to_string
 from guardian.mixins import GuardianUserMixin
 from model_utils.managers import PassThroughManager
+from django.utils.translation import ugettext as _
 from template_mail.utils import send_tpl_email
 import notifications
 
@@ -45,8 +49,14 @@ class CustomUserManager(GuardianUserMixin, PassThroughManager.for_queryset_class
         return user
 
 
+def generate_api_key(n=32):
+    return ''.join(random.SystemRandom().choice(string.letters + string.digits) for _ in xrange(n))
+
+
 class User(AbstractUser):
     objects = CustomUserManager()
+    key = models.CharField(verbose_name=_("Api-key"), max_length=32, editable=False,
+        default=generate_api_key)
 
     def __unicode__(self):
 
@@ -57,12 +67,16 @@ class User(AbstractUser):
             text += ' (team)'
         return text
 
+    def regenerate_api_key(self):
+        self.key = generate_api_key()
+
     def send_tpl_email_user(self, template_name, context, from_email, **kwds):
         return send_tpl_email(template_name, self.email, context, from_email, **kwds)
 
     def notify(self, actor, verb, target, from_email=None):
         notifications.notify.send(actor, verb=verb, target=target, recipient=self)
-        template_name = '%s/email/%s_%s.txt' % (target._meta.app_label, target._meta.model_name, verb)
+        template_name = '%s/email/%s_%s.txt' % (target._meta.app_label,
+            target._meta.model_name, verb)
         context = dict(actor=actor, verb=verb, target=target, recipient=self)
         if from_email:
             context['email'] = from_email

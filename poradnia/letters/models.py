@@ -50,10 +50,6 @@ class Letter(AbstractRecord):
 
         return users_to_notify
 
-    def get_absolute_url(self):
-        case_url = self.record.case_get_absolute_url()
-        return "%s#letter-%s" % (case_url, self.pk)
-
     def is_done(self):
         return (True if self.status == self.STATUS.done else False)
 

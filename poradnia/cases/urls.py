@@ -9,4 +9,6 @@ urlpatterns = patterns('',
    url(r'^case-(?P<pk>\d+)/permission/all$', views.permission,
        name="permission_all", kwargs={"limit": 'all'}),
    url(r'^case-(?P<pk>\d+)$', views.detail, name="detail"),
+   # url(r'^feed/events/(?P<username>\w-)/(?P<key>\w+)$', views.CalendarEventFeed, name="calendar_event_feed"),
+
 )
