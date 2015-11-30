@@ -13,29 +13,19 @@ from atom.ext.crispy_forms.forms import FormHorizontalMixin, HelperMixin, Single
 from .models import Case, PermissionGroup
 
 
-class CaseForm(UserKwargModelFormMixin, FormHorizontalMixin, SingleButtonMixin, forms.ModelForm):
-
+class UpdateCaseForm(UserKwargModelFormMixin, FormHorizontalMixin, SingleButtonMixin,
+                     forms.ModelForm):
     def __init__(self, *args, **kwargs):
-        super(CaseForm, self).__init__(*args, **kwargs)
-        if 'instance' in kwargs:
-            self.helper.form_action = kwargs['instance'].get_edit_url()
+        super(UpdateCaseForm, self).__init__(*args, **kwargs)
+        self.helper.form_action = reverse('cases:edit', kwargs={'pk': str(self.instance.pk)})
 
-    def save(self, commit=True, *args, **kwargs):
-        obj = super(CaseForm, self).save(commit=False, *args, **kwargs)
-        if obj.pk:  # update
-            obj.modified_by = self.user
-            obj.send_notification(self.user, staff=True, verb='updated')
-        else:  # new
-            obj.send_notification(self.user, staff=True, verb='created')
-            obj.created_by = self.user
-        if commit:
-            obj.save()
-        return obj
+    def save(self, *args, **kwargs):
+        self.instance.modified_by = self.user
+        return super(UpdateCaseForm, self).save(commit=False, *args, **kwargs)
 
     class Meta:
-        # Set this form to use the User model.
         model = Case
-        fields = ("name", "status", "tags")
+        fields = ("name",)
 
 
 class CaseGroupPermissionForm(HelperMixin, forms.Form):
@@ -63,9 +53,3 @@ class CaseGroupPermissionForm(HelperMixin, forms.Form):
 
         for perm in perms:
             assign_perm(perm, self.cleaned_data['user'], self.case)
-
-        self.case.send_notification(actor=self.user,
-                                    verb='grant_group',
-                                    action_object=self.cleaned_data['user'],
-                                    action_target=self.cleaned_data['group'],
-                                    staff=True)

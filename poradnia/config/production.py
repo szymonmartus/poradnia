@@ -92,3 +92,5 @@ class Production(Common):
     MIDDLEWARE_CLASSES = (
         "raven.contrib.django.raven_compat.middleware.Sentry404CatchMiddleware",
     ) + MIDDLEWARE_CLASSES
+    EMAIL_BACKEND = "djmail.backends.default.EmailBackend"
+    DJMAIL_REAL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

@@ -47,3 +47,5 @@ icalendar==3.9.1
 html2text==2015.6.21
 pyGravatar==0.0.6
 django-bootstrap-pagination==1.5.1
+https://github.com/ad-m/djmail/archive/patch-3.zip
+

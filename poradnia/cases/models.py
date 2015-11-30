@@ -108,13 +108,20 @@ class Case(models.Model):
     def get_edit_url(self):
         return reverse('cases:edit', kwargs={'pk': str(self.pk)})
 
-    def get_users_with_perms(self, *args, **kwargs):
-        return get_users_with_perms(self, with_group_users=False, *args, **kwargs)
+    def get_users_with_perms(self, is_staff=None, exclude_pk=None, *args, **kwargs):
+        qs = get_users_with_perms(self, with_group_users=False, *args, **kwargs)
+        if is_staff is not None:
+            qs = qs.filter(is_staff=is_staff)
+        if exclude_pk:
+            qs = qs.exclude(pk=exclude_pk)
+        return qs
 
     def __unicode__(self):
         return self.name
 
-    def get_email(self):
+    def get_email(self, user=None):
+        if user:
+            return "%s <%s>" % (user, self.get_email())
         return settings.PORADNIA_EMAIL_OUTPUT % self.__dict__
 
     @classmethod

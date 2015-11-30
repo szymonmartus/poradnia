@@ -1,0 +1,8 @@
+{% extends 'emails/_case_base-body-html.html' %}
+
+{% block msg %}
+<p>{{actor}} nadał/-a uprawnienia do sprawy <b>{{case}}</b> dla nastepujących użytkowników:</p>
+<ul>
+{{users|unordered_list}}
+</ul>
+{% endblock %}

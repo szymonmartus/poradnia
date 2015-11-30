@@ -3,11 +3,12 @@ from letters.factories import LetterFactory
 from users.factories import UserFactory
 from django.test import TestCase, RequestFactory
 from cases.filters import StaffCaseFilter
-from django.core.urlresolvers import reverse_lazy
+from django.core.urlresolvers import reverse_lazy, reverse
 from cases.models import Case
 from django.test.utils import override_settings
 from guardian.shortcuts import assign_perm
 from django.core.exceptions import PermissionDenied
+from django.core import mail
 from django.contrib.admin.sites import AdminSite
 from cases.admin import CaseAdmin
 
@@ -154,3 +155,37 @@ class CaseAdminTestCase(TestCase):
         obj = qs.get(pk=case.pk)
         self.assertTrue(hasattr(obj, 'record_count'))
         self.assertEqual(admin_obj.record_count(obj), 25)
+
+
+class CaseUpdateTestCase(TestCase):
+    def _make_user(self, **kwargs):
+        user = UserFactory(**kwargs)
+        assign_perm('cases.can_view', user, self.object)
+        assign_perm('cases.change_case', user, self.object)
+        return user
+
+    def setUp(self):
+        self.object = CaseFactory()
+        self.url = reverse('cases:edit', kwargs={'pk': str(self.object.pk)})
+
+    def test_permission_check(self):
+        user = UserFactory()
+        self.client.login(username=user.username, password='pass')
+
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 403)
+
+        assign_perm('cases.can_view', user, self.object)
+        assign_perm('cases.change_case', user, self.object)
+
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_send_notify(self):
+        self.staff_actor = self._make_user(is_staff=True)
+        self.client.login(username=self.staff_actor.username, password='pass')
+        staff = self._make_user(is_staff=True)
+        user = self._make_user()
+        resp = self.client.post(self.url, data={'name': 'Example nexxw title',
+                                                'status': '0'})
+        self.assertEqual(len(mail.outbox), 1)

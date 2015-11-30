@@ -7,7 +7,8 @@ from django.shortcuts import get_object_or_404
 from django.utils.translation import ugettext as _
 from django.views.generic import FormView
 from django.views.generic.detail import SingleObjectMixin
-
+from djmail.template_mail import MagicMailBuilder
+from django.utils.encoding import force_text
 from users.forms import TranslatedManageObjectPermissionForm, TranslatedUserObjectPermissionsForm
 
 from ..forms import CaseGroupPermissionForm
@@ -36,11 +37,20 @@ class UserPermissionCreateView(UserFormKwargsMixin, FormView):
 
     def form_valid(self, form):
         form.save_obj_perms()
-        for user in form.cleaned_data['users']:
-            self.case.send_notification(actor=self.request.user, staff=True, verb='granted')
-            messages.success(self.request,
-                _("Success granted permission of %(user)s to %(case)s") %
-                {'user': user, 'case': self.case})
+        # Messages
+        user_string = ", ".join(map(force_text, form.cleaned_data['users']))
+        messages.success(self.request,
+                         _("Success granted permissions of %(users_join)s to %(case)s") %
+                         {'users_join': user_string, 'case': self.case})
+        # Mail notification
+        context = {'actor': self.request.user,
+                   'case': self.case,
+                   'users': form.cleaned_data['users']}
+        from_email = self.case.get_email(self.request.user)
+        for user in self.case.get_users_with_perms(is_staff=True):
+            MagicMailBuilder().case_permission_granted(to=user,
+                                                       from_email=from_email,
+                                                       context=context).send()
         self.case.status_update()
         return super(UserPermissionCreateView, self).form_valid(form)
 
@@ -70,6 +80,18 @@ class UserPermissionUpdateView(FormValidMessageMixin, FormView):
         context['object'] = self.case
         return context
 
+    def form_valid(self, form, *args, **kwargs):
+        context = {'actor': self.request.user,
+                   'case': self.case,
+                   'user': self.action_user}
+        from_email = self.case.get_email(self.request.user)
+        for user in self.case.get_users_with_perms(is_staff=True):
+            MagicMailBuilder().case_permisison_updated(to=user,
+                                                       from_email=from_email,
+                                                       context=context).send()
+        self.case.status_update()
+        return super(UserPermissionUpdateView, self).form_valid(form=form, *args, **kwargs)
+
     def get_form_valid_message(self):
         return _("Updated permission %(user)s to %(case)s!") %\
             ({'user': self.action_user, 'case': self.case})
@@ -95,6 +117,16 @@ class CaseGroupPermissionView(FormValidMessageMixin, SingleObjectMixin, FormView
     def form_valid(self, form, *args, **kwargs):
         self.form = form
         form.assign()
+        context = {'actor': self.request.user,
+                   'case': self.object,
+                   'user': form.cleaned_data['user'],
+                   'group': form.cleaned_data['group']}
+        from_email = self.object.get_email(self.request.user)
+        for user in self.object.get_users_with_perms(is_staff=True):
+            MagicMailBuilder().case_permission_group(to=user,
+                                                     from_email=from_email,
+                                                     context=context).send()
+        self.object.status_update()
         return super(CaseGroupPermissionView, self).form_valid(form=form, *args, **kwargs)
 
     def get_success_url(self):

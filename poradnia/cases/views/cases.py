@@ -14,8 +14,9 @@ from records.models import Record
 from users.views import PermissionMixin
 
 from cases.filters import StaffCaseFilter, UserCaseFilter
-from cases.forms import CaseForm, CaseGroupPermissionForm
+from cases.forms import UpdateCaseForm, CaseGroupPermissionForm
 from cases.models import Case
+from cases.utils import notify_update_case_form
 
 
 class CaseDetailView(LoginRequiredMixin, TemplateView):  # TODO: Use django.views.generic.DetailView
@@ -75,16 +76,22 @@ class CaseListView(PermissionMixin, FilterView):
 
 
 class CaseUpdateView(UserFormKwargsMixin, UpdateView):
-    form_class = CaseForm
+    form_class = UpdateCaseForm
     template_name = 'cases/case_form.html'
     model = Case
 
     def get_object(self):
         obj = super(CaseUpdateView, self).get_object()
-        obj.perm_check(self.request.user, 'can_change_case')
+        obj.perm_check(self.request.user, 'change_case')
         return obj
 
     def form_valid(self, form):
-        obj = form.save()
-        messages.success(self.request, _('Successful updated "%(object)s".') % {'object': obj})
-        return redirect(obj)
+        form.save()
+        notify_update_case_form(name='case_update',
+                                actor=self.request.user,
+                                is_staff=True,
+                                case=form.instance,
+                                form=form)
+        messages.success(self.request, _('Successful updated "%(object)s".') %
+                         {'object': form.instance})
+        return redirect(form.instance)

@@ -1,0 +1,8 @@
+{% extends 'emails/_case_base-body-html.html' %}
+
+{% block msg %}
+<p>{{actor}} zaktualizował/-a następujące pola dla sprawy <b>{{case}}</b>:</p>
+<ul>
+{{changed_labels|unordered_list}}
+</ul>
+{% endblock %}
