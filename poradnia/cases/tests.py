@@ -5,12 +5,65 @@ from django.test import TestCase, RequestFactory
 from cases.filters import StaffCaseFilter
 from django.core.urlresolvers import reverse_lazy, reverse
 from cases.models import Case
+import datetime
+from datetime import timedelta
+from django.contrib.admin.sites import AdminSite
+from django.core.exceptions import PermissionDenied
+from django.core.urlresolvers import reverse_lazy
+from django.test import RequestFactory, TestCase
 from django.test.utils import override_settings
+from django.utils.timezone import utc
+
 from guardian.shortcuts import assign_perm
 from django.core.exceptions import PermissionDenied
 from django.core import mail
 from django.contrib.admin.sites import AdminSite
+
 from cases.admin import CaseAdmin
+from cases.factories import CaseFactory
+from cases.filters import StaffCaseFilter
+from cases.models import Case
+from letters.factories import LetterFactory
+from letters.models import Letter
+from users.factories import UserFactory
+
+
+class CaseQuerySetTestCase(TestCase):
+    def setUp(self):
+        self.user = UserFactory()
+
+    def test_for_user_cant(self):
+        self.assertFalse(Case.objects.for_user(self.user).filter(pk=CaseFactory().pk).exists())
+
+    def test_for_user_can_view_all(self):
+        assign_perm('cases.can_view_all', self.user)
+        self.assertTrue(Case.objects.for_user(self.user).filter(pk=CaseFactory().pk).exists())
+
+    def test_for_user_can_view_client(self): # perm set by signal
+        self.assertTrue(Case.objects.for_user(self.user).filter(pk=CaseFactory(created_by=self.user).pk).exists())
+
+    def test_for_user_can_view_created(self): # perm set by signal
+        self.assertTrue(Case.objects.for_user(self.user).filter(pk=CaseFactory(client=self.user).pk).exists())
+
+    def test_with_perm(self):
+        CaseFactory.create_batch(size=25)
+        with self.assertNumQueries(2):
+            qs = Case.objects.with_perm().all()
+            for obj in qs:
+                list(obj.caseuserobjectpermission_set.all())
+
+    def test_with_record_count(self):
+        obj = CaseFactory()
+        LetterFactory.create_batch(size=25, case=obj)
+        self.assertEqual(Case.objects.filter(pk=obj.pk).with_record_count().get().record_count, 25)
+
+    def test_by_involved_in(self):
+        # TODO
+        self.assertTrue(True)
+
+    def test_by_msg(self):
+        # TODO
+        self.assertTrue(True)
 
 
 class CaseTestCase(TestCase):
@@ -61,6 +114,26 @@ class CaseTestCase(TestCase):
         self.object.status_update(reopen=True)
         self.assertEqual(self.object.status, Case.STATUS.free)
 
+    def test_update_counters_last_received_default(self):
+        self.object.update_counters()
+        self.assertEqual(self.object.last_received, None)
+
+    def _make_letter(self):  # Hack for Travis
+        o = LetterFactory(case=self.object, created_by__is_staff=False)
+        return Letter.objects.get(pk=o.pk)
+
+    def test_update_counters_last_received_setup(self):
+        l = self._make_letter()
+        self.object.update_counters()
+        self.assertEqual(l.created_on, self.object.last_received)
+
+    def test_update_counters_last_received_update(self):
+        self._make_letter()
+        self.object.update_counters()
+        new = self._make_letter()
+        self.object.update_counters()
+        self.assertEqual(new.created_on, self.object.last_received)
+
 
 class CaseDetailViewTestCase(TestCase):
     def setUp(self):
@@ -102,21 +175,23 @@ class StaffCaseFilterTestCase(TestCase):
     def test_permission_filter(self):
         obj = CaseFactory()
         self.assertFalse(self.get_permission_filter_qs(user=UserFactory(), pk=obj.pk).exists())
-        self.assertTrue(self.get_permission_filter_qs(user=obj.created_by, pk=obj.pk).exists())
+        user = UserFactory(is_staff=True)
+        assign_perm('cases.can_view', user, obj)
+        self.assertTrue(self.get_permission_filter_qs(user=user, pk=obj.pk).exists())
 
     def _get_filter(self, user=None, choice='default'):
         return StaffCaseFilter(user=user or UserFactory()).get_order_by(choice)
 
     def test_order_by(self):
-        self.assertEqual(self._get_filter(), ['-deadline', 'status', '-last_send', '-last_action'])
+        self.assertEqual(self._get_filter(), ['-last_action', ])
         self.assertEqual(self._get_filter(choice='status'), ['status'])
 
     def test_form_fields(self):
         su_user = UserFactory(is_staff=True, is_superuser=True)
         self.assertEqual(StaffCaseFilter(user=su_user).form.fields.keys(),
-                         ['status', 'client', 'name', 'handled', 'permission', 'o'])
+                         ['status', 'handled', 'client', 'name', 'permission', 'o'])
         self.assertEqual(StaffCaseFilter(user=UserFactory(is_staff=True)).form.fields.keys(),
-                         ['status', 'client', 'name', 'handled', 'o'])
+                         ['status', 'handled', 'client', 'name', 'o'])
 
 
 class CaseListViewTestCase(TestCase):
@@ -184,8 +259,8 @@ class CaseUpdateTestCase(TestCase):
     def test_send_notify(self):
         self.staff_actor = self._make_user(is_staff=True)
         self.client.login(username=self.staff_actor.username, password='pass')
-        staff = self._make_user(is_staff=True)
-        user = self._make_user()
-        resp = self.client.post(self.url, data={'name': 'Example nexxw title',
-                                                'status': '0'})
-        self.assertEqual(len(mail.outbox), 1)
+        self._make_user(is_staff=True)
+        self._make_user()
+        self.client.post(self.url, data={'name': 'Example nexxw title',
+                                         'status': '0'})
+        self.assertEqual(len(mail.outbox), 2)

@@ -20,7 +20,6 @@ env:
 matrix:
   allow_failures:
     - env: TOX_ENV=flake8
-    - env: TOX_ENV=py27-dj18
     - env: TOX_ENV=py27-djmaster
     - env: TOX_ENV=py33-dj18
     - env: TOX_ENV=py33-djmaster
@@ -34,3 +33,7 @@ script:
 
 notifications:
   slack: watchdogpolska:mQq180xGu9UcuJgK73hVWECD
+
+after_script:
+- rm $HOME/.cache/pip/log/*
+

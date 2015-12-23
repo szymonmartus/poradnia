@@ -5,13 +5,13 @@ poradnia
    :target: https://codeclimate.com/github/watchdogpolska/poradnia
    :alt: Code Climate
 
-.. image:: https://scrutinizer-ci.com/g/watchdogpolska/poradnia/badges/quality-score.png?b=master
-   :target: https://scrutinizer-ci.com/g/watchdogpolska/poradnia/?branch=master
-   :alt: Scrutinizer Code Quality
-
 .. image:: https://requires.io/github/watchdogpolska/poradnia/requirements.svg?branch=master
      :target: https://requires.io/github/watchdogpolska/poradnia/requirements/?branch=master
      :alt: Requirements Status
+
+.. image:: https://img.shields.io/badge/translations-pl%20|%20en-brightgreen.svg
+     :target: https://crowdin.com/project/poradnia
+     :alt: Translations
 
 .. image:: https://img.shields.io/github/issues/watchdogpolska/poradnia.svg
      :target: https://github.com/watchdogpolska/poradnia/issues
@@ -19,6 +19,17 @@ poradnia
      
 .. image:: https://img.shields.io/github/license/watchdogpolska/poradnia.svg
      :alt: License
+
+.. image:: https://badge.waffle.io/watchdogpolska/poradnia.svg?label=high&title=High 
+     :target: https://waffle.io/watchdogpolska/poradnia 
+     :alt: 'Stories in High'
+
+.. image:: https://www.quantifiedcode.com/api/v1/project/0b4753d4b3bd41f797b40458c3cea67a/badge.svg
+  :target: https://www.quantifiedcode.com/app/project/0b4753d4b3bd41f797b40458c3cea67a
+  :alt: Code issues
+
+.. image:: https://coveralls.io/repos/watchdogpolska/poradnia/badge.svg?branch=master&service=github
+  :target: https://coveralls.io/github/watchdogpolska/poradnia?branch=master 
 
 Settings
 ------------

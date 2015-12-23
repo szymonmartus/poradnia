@@ -16,7 +16,6 @@ urlpatterns = patterns('',
     url(r'^$',
         TemplateView.as_view(template_name='pages/home.html'),
         name="home"),
-    # Uncomment the next line to enable the admin:
     url(r'^admin/', include(admin.site.urls)),
 
     # User management
@@ -27,8 +26,6 @@ urlpatterns = patterns('',
     # Flatpages
     url(r'^strony/', include('django.contrib.flatpages.urls')),
     url(r'^tinymce/', include('tinymce.urls')),
-    # Notifications
-    url(r'^powiadomienia/', include('notifications_custom.urls', namespace="notifications")),
     # Poradnia
     url(r'^sprawy/', include('cases.urls', namespace='cases')),
     url(r'^listy/', include('letters.urls', namespace='letters')),
@@ -42,8 +39,8 @@ urlpatterns = patterns('',
 if settings.DEBUG:
     import debug_toolbar
     urlpatterns += patterns('',
-        url(r'^__debug__/', include(debug_toolbar.urls)),
-    )
+                            url(r'^__debug__/', include(debug_toolbar.urls)),
+                            )
 
 
 def handler500(request):

@@ -1,9 +1,10 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import os
 
 import claw
 import html2text
+from atom.models import AttachmentBase
 from claw import quotations
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -17,9 +18,7 @@ from django_mailbox.models import Message
 from django_mailbox.signals import message_received
 from model_utils import Choices
 from model_utils.fields import MonitorField, StatusField
-from model_utils.managers import PassThroughManager
 
-from atom.models import AttachmentBase
 from cases.models import Case
 from records.models import AbstractRecord, AbstractRecordQuerySet
 from template_mail.utils import send_tpl_email
@@ -37,6 +36,9 @@ class LetterQuerySet(AbstractRecordQuerySet):
     def last_staff_send(self):
         return self.filter(status='done', created_by__is_staff=True).order_by(
                 '-created_on', '-id').all()[0]
+
+    def last_received(self):
+        return self.filter(created_by__is_staff=False).order_by('-created_on', '-id').all()[0]
 
     def last(self):
         return self.order_by('-created_on', '-id').all()[0]
@@ -72,7 +74,7 @@ class Letter(AbstractRecord):
         help_text=_(u'Original full content of message')
     )
 
-    objects = PassThroughManager.for_queryset_class(LetterQuerySet)()
+    objects = LetterQuerySet.as_manager()
 
     def __unicode__(self):
         return self.name
@@ -122,22 +124,24 @@ class Attachment(AttachmentBase):
 
 @receiver(message_received)
 def mail_process(sender, message, **args):
-    print (u"I just recieved a messtsage titled ", message.subject.encode('utf-8'),
-           u'from a mailbox named ', message.mailbox.name)
+    print ("I just recieved a messsage titled {title} " +
+           "from a mailbox {mbox}".format(title=message.subject.encode('utf-8'),
+                                          mbox=message.mailbox.name))
     # new_user + poradnia@ => new_user @ new_user
     # new_user + case => FAIL
     # old_user + case => PASS
     # many_case => FAIL
 
+    # Skip autoreply messages - see RFC3834
+    if (lambda x: 'Auto-Submitted' in x and
+            x['Auto-Submitted'] == 'auto-replied')(message.get_email_object()):
+        print("Delete .eml from {email} as auto-replied".format(email=message.from_address[0]))
+        message.eml.delete(save=True)
+        return
+
     # Identify user
     user = get_user_model().objects.get_by_email_or_create(message.from_address[0])
     print("Identified user: ", user)
-
-    # Skip autoreply messages - see RFC3834
-    if (lambda x: 'Auto-Submitted' in 'x' and
-            x['Auto-Submitted'] == 'auto-replied')(message.get_email_object()):
-        print("Skip")
-        return
 
     # Identify case
     try:  # TODO: Is it old case?
@@ -172,11 +176,20 @@ def mail_process(sender, message, **args):
         status = Letter.STATUS.done
 
     # Update case status (re-open)
+    case_updated = False
     if not user.is_staff and case.status == Case.STATUS.closed:
-        case.status_update(reopen=True)
+        case.status_update(reopen=True, save=False)
+        case_updated = True
     if user.is_staff:
         case.handled = True
+        case_updated = True
+    if user.is_staff and status == Letter.STATUS.done:
+        case.has_project = False
+        case_updated = True
+
+    if case_updated:
         case.save()
+
     obj = Letter(name=message.subject,
                  created_by=user,
                  case=case,

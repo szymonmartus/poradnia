@@ -7,6 +7,9 @@ from django.utils.translation import ugettext as _
 from django.views.generic import TemplateView, UpdateView
 from django_filters.views import FilterView
 
+from cases.filters import StaffCaseFilter, UserCaseFilter
+from cases.forms import CaseGroupPermissionForm
+from cases.models import Case
 from events.forms import EventForm
 from letters.forms import AddLetterForm
 from letters.helpers import AttachmentFormSet
@@ -27,7 +30,6 @@ class CaseDetailView(LoginRequiredMixin, TemplateView):  # TODO: Use django.view
         context = {}
         qs = (Case.objects.
               select_related('created_by').
-              select_related('triggered').
               select_related('modified_by'))
         case = get_object_or_404(qs, pk=self.kwargs['pk'])
         case.view_perm_check(self.request.user)
@@ -67,7 +69,10 @@ class CaseListView(PermissionMixin, FilterView):
 
     def get_queryset(self, *args, **kwargs):  # TODO: Mixins
         qs = super(CaseListView, self).get_queryset(*args, **kwargs)
-        return qs.select_related('client').prefetch_related('tags')
+        qs = qs.select_related('client').prefetch_related('tags')
+        if self.request.user.is_staff:
+            qs = qs.with_involved_staff()
+        return qs
 
     def get_context_data(self, **kwargs):
         context = super(CaseListView, self).get_context_data(**kwargs)

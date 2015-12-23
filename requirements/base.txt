@@ -1,16 +1,13 @@
 # Configuration
-django-configurations==0.8
-django-secure==1.0.1
-django-cache-url==1.0.0
-dj-database-url==0.3.0
+django-environ==0.4.0
 
 # Forms
 django-braces==1.8.1
 django-crispy-forms==1.5.2
-django-floppyforms==1.5.2
+django-floppyforms==1.6.0
 
 # Models
-django-model-utils==2.3.1
+django-model-utils==2.4
 
 # images
 Pillow==3.0.0
@@ -18,10 +15,10 @@ sorl-thumbnail==12.3
 
 # For user registration, either via email or social
 # Well-built with regular release cycles!
-django-allauth==0.23.0
+django-allauth==0.24.1
 
 # For the persistance stores
-mysqlclient==1.3.6
+mysqlclient==1.3.7
 
 # Unicode slugification
 unicode-slugify==0.1.3
@@ -29,22 +26,21 @@ django-autoslug==1.9.3
 
 # Useful things
 # Time zones support
-pytz==2015.6
+pytz==2015.7
 
 # Your custom requirements go here
-django-guardian==1.3.1
-django-notifications-hq==0.7.1
-django-mailbox==4.4.4
+django-guardian==1.3.2
+django-mailbox==4.4.5
 claw==1.3.0
 django-filter==0.11.0
 django-autocomplete-light==2.2.10
 django-multiupload==0.5
 https://github.com/sp1ky/django-flatpages-tinymce/archive/3808a58e8f67491a4e7ed72bceca3f6d760a8c98.zip
 https://github.com/ad-m/django-atom/archive/v0.9.0.zip
-django-tinymce==2.0.5
+django-tinymce==2.0.6
 django-tinycontent==0.5.1
 icalendar==3.9.1
-html2text==2015.6.21
+html2text==2015.11.4
 pyGravatar==0.0.6
 django-bootstrap-pagination==1.5.1
 https://github.com/ad-m/djmail/archive/patch-3.zip
