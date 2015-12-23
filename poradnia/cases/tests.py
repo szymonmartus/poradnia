@@ -1,23 +1,14 @@
-from cases.factories import CaseFactory
-from letters.factories import LetterFactory
-from users.factories import UserFactory
-from django.test import TestCase, RequestFactory
-from cases.filters import StaffCaseFilter
-from django.core.urlresolvers import reverse_lazy, reverse
-from cases.models import Case
 import datetime
 from datetime import timedelta
+
 from django.contrib.admin.sites import AdminSite
+from django.core import mail
 from django.core.exceptions import PermissionDenied
-from django.core.urlresolvers import reverse_lazy
+from django.core.urlresolvers import reverse, reverse_lazy
 from django.test import RequestFactory, TestCase
 from django.test.utils import override_settings
 from django.utils.timezone import utc
-
 from guardian.shortcuts import assign_perm
-from django.core.exceptions import PermissionDenied
-from django.core import mail
-from django.contrib.admin.sites import AdminSite
 
 from cases.admin import CaseAdmin
 from cases.factories import CaseFactory

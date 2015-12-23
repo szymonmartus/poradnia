@@ -4,6 +4,7 @@ Production Configurations
 '''
 
 from .common import *  # noqa
+
 # SECRET KEY
 SECRET_KEY = env.str('DJANGO_SECRET_KEY')
 # END SECRET KEY
@@ -40,4 +41,3 @@ CACHES = {
 
 EMAIL_BACKEND = "djmail.backends.default.EmailBackend"
 DJMAIL_REAL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-
