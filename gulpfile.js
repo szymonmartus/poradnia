@@ -49,6 +49,7 @@ var config = (function () {
                 path.bower + '/jquery/dist/jquery.js',
                 path.bower + '/bootstrap-sass/assets/javascripts/bootstrap/tab.js',
                 path.bower + '/bootstrap-sass/assets/javascripts/bootstrap/tooltip.js',
+                path.bower + '/bootstrap-sass/assets/javascripts/bootstrap/modal.js',
                 path.bower + '/moment/moment.js',
                 path.bower + '/moment/locale/pl.js',
                 path.bower + '/pikaday-time/pikaday.js',
@@ -94,7 +95,7 @@ gulp.task('scss', function () {
             sourcemap: true
         }
     )
-        .pipe(prefix("last 1 version", "> 1%", "ie 8", "ie 7"))
+        .pipe(prefix())
         .pipe(gulp.dest(config.scss.output))
         .pipe(livereload())
         .pipe(rename({extname: '.min.css'}))

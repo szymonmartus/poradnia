@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import autocomplete_light
+import autocomplete_light.shortcuts as autocomplete_light
 from atom.ext.crispy_forms.forms import FormHorizontalMixin, HelperMixin, SingleButtonMixin
 from braces.forms import UserKwargModelFormMixin
 from crispy_forms.layout import Submit
@@ -12,19 +12,28 @@ from guardian.shortcuts import assign_perm
 from .models import Case, PermissionGroup
 
 
-class UpdateCaseForm(UserKwargModelFormMixin, FormHorizontalMixin, SingleButtonMixin,
-                     forms.ModelForm):
+class CaseForm(UserKwargModelFormMixin, FormHorizontalMixin, SingleButtonMixin,
+               forms.ModelForm):
     def __init__(self, *args, **kwargs):
-        super(UpdateCaseForm, self).__init__(*args, **kwargs)
+        super(CaseForm, self).__init__(*args, **kwargs)
         self.helper.form_action = reverse('cases:edit', kwargs={'pk': str(self.instance.pk)})
 
-    def save(self, *args, **kwargs):
-        self.instance.modified_by = self.user
-        return super(UpdateCaseForm, self).save(commit=False, *args, **kwargs)
+    def save(self, commit=True, *args, **kwargs):
+        obj = super(CaseForm, self).save(commit=False, *args, **kwargs)
+        if obj.pk:  # old
+            obj.modified_by = self.user
+            if obj.status == Case.STATUS.assigned:
+                obj.send_notification(self.user, staff=True, verb='updated')
+        else:  # new
+            obj.send_notification(self.user, staff=True, verb='created')
+            obj.created_by = self.user
+        if commit:
+            obj.save()
+        return obj
 
     class Meta:
         model = Case
-        fields = ("name",)
+        fields = ("name", "status", "has_project")
 
 
 class CaseGroupPermissionForm(HelperMixin, forms.Form):
@@ -36,9 +45,9 @@ class CaseGroupPermissionForm(HelperMixin, forms.Form):
     group = forms.ModelChoiceField(queryset=PermissionGroup.objects.all(),
                                    label=_("Permissions group"))
 
-    def __init__(self, user, case=None, *args, **kwargs):
-        self.case = case
-        self.user = user
+    def __init__(self, *args, **kwargs):
+        self.case = kwargs.pop('case')
+        self.user = kwargs.pop('user')
         super(CaseGroupPermissionForm, self).__init__(*args, **kwargs)
         self.fields['user'].queryset = get_user_model().objects.for_user(self.user)
         self.helper.form_class = 'form-inline'
@@ -52,3 +61,32 @@ class CaseGroupPermissionForm(HelperMixin, forms.Form):
 
         for perm in perms:
             assign_perm(perm, self.cleaned_data['user'], self.case)
+
+        self.case.send_notification(actor=self.user,
+                                    verb='grant_group',
+                                    action_object=self.cleaned_data['user'],
+                                    action_target=self.cleaned_data['group'],
+                                    staff=True)
+
+
+class CaseCloseForm(UserKwargModelFormMixin, HelperMixin, forms.ModelForm):
+
+    notify = forms.BooleanField(required=False, label=_("Notify user"))
+
+    def __init__(self, *args, **kwargs):
+        super(CaseCloseForm, self).__init__(*args, **kwargs)
+        self.helper.add_input(Submit('action', _('Close'), css_class="btn-primary"))
+
+        if 'instance' in kwargs:
+            self.helper.form_action = kwargs['instance'].get_close_url()
+        self.instance.modified_by = self.user
+        self.instance.status = Case.STATUS.closed
+
+    def save(self, commit=True, *args, **kwargs):
+        if self.cleaned_data['notify']:
+            self.instance.send_notification(self.user, staff=False, verb='closed')
+        return super(CaseCloseForm, self).save(commit=True, *args, **kwargs)
+
+    class Meta:
+        model = Case
+        fields = ()

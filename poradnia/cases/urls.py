@@ -1,10 +1,11 @@
-from django.conf.urls import patterns, url
+from django.conf.urls import url
 
 from . import views
 
-urlpatterns = patterns('',
+urlpatterns = [
     url(r'^$', views.CaseListView.as_view(), name="list"),
     url(r'^sprawa-(?P<pk>\d+)/edytuj/$', views.CaseUpdateView.as_view(), name="edit"),
+    url(r'^sprawa-(?P<pk>\d+)/zamknij/$', views.CaseCloseView.as_view(), name="close"),
     url(r'^sprawa-(?P<pk>\d+)/uprawnienia/$', views.UserPermissionCreateView.as_view(),
         name="permission_add"),
     url(r'^sprawa-(?P<pk>\d+)/uprawnienia-(?P<username>[\w.@+-]+)/$',
@@ -12,4 +13,4 @@ urlpatterns = patterns('',
     url(r'^sprawa-(?P<pk>\d+)/uprawnienia/przyznaj/$', views.CaseGroupPermissionView.as_view(),
         name="permission_grant"),
     url(r'^sprawa-(?P<pk>\d+)/$', views.CaseDetailView.as_view(), name="detail"),
-)
+]

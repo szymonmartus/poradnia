@@ -56,7 +56,6 @@ LOCAL_APPS = (
     'users',  # custom users app
     'keys',
     'cases',
-    'cases.tags',
     'letters',
     'records',
     'events',
@@ -64,6 +63,7 @@ LOCAL_APPS = (
     'feedback_custom',
     'tasty_feedback',
     'bootstrap_pagination',
+    'navsearch'
     # Your stuff: custom apps go here
 )
 
@@ -138,7 +138,7 @@ MANAGERS = ADMINS
 # DATABASE CONFIGURATION
 # See: https://docs.djangoproject.com/en/dev/ref/settings/#databases
 DATABASES = {
-    'default': env.db(),
+    'default': env.db(default='sqlite://:memory:'),
 }
 # END DATABASE CONFIGURATION
 
@@ -174,13 +174,13 @@ USE_TZ = True
 # See: https://docs.djangoproject.com/en/dev/ref/settings/#template-context-processors
 TEMPLATE_CONTEXT_PROCESSORS = (
     'django.contrib.auth.context_processors.auth',
-    'django.core.context_processors.debug',
-    'django.core.context_processors.i18n',
-    'django.core.context_processors.media',
-    'django.core.context_processors.static',
-    'django.core.context_processors.tz',
+    'django.template.context_processors.debug',
+    'django.template.context_processors.i18n',
+    'django.template.context_processors.media',
+    'django.template.context_processors.static',
+    'django.template.context_processors.tz',
     'django.contrib.messages.context_processors.messages',
-    'django.core.context_processors.request',
+    'django.template.context_processors.request',
     # Your stuff: custom template context processers go here
 )
 
@@ -293,6 +293,7 @@ LOGGING = {
 # Your common stuff: Below this line define 3rd party library settings
 # Guardian settings
 ANONYMOUS_USER_ID = -1
+ANONYMOUS_USER_NAME = 'AnonymousUser'
 GUARDIAN_MONKEY_PATCH = False
 
 LANGUAGES = (
@@ -318,3 +319,18 @@ FEEDBACK_GITHUB_REPO = 'https://github.com/watchdogpolska/poradnia'
 DJANGO_MAILBOX_STORE_ORIGINAL_MESSAGE = True
 
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
+
+EMAIL_BACKEND = env.str('DJANGO_EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': TEMPLATE_DIRS,
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': TEMPLATE_CONTEXT_PROCESSORS,
+        },
+    },
+]
+FILTERS_HELP_TEXT_FILTER = False

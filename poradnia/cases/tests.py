@@ -1,18 +1,19 @@
-import datetime
 from datetime import timedelta
 
+import django
 from django.contrib.admin.sites import AdminSite
 from django.core import mail
 from django.core.exceptions import PermissionDenied
 from django.core.urlresolvers import reverse, reverse_lazy
 from django.test import RequestFactory, TestCase
 from django.test.utils import override_settings
-from django.utils.timezone import utc
+from django.utils.timezone import now
 from guardian.shortcuts import assign_perm
 
 from cases.admin import CaseAdmin
 from cases.factories import CaseFactory
 from cases.filters import StaffCaseFilter
+from cases.forms import CaseCloseForm
 from cases.models import Case
 from letters.factories import LetterFactory
 from letters.models import Letter
@@ -23,6 +24,9 @@ class CaseQuerySetTestCase(TestCase):
     def setUp(self):
         self.user = UserFactory()
 
+    def test_for_assign_cant(self):
+        self.assertFalse(Case.objects.for_user(self.user).filter(pk=CaseFactory().pk).exists())
+
     def test_for_user_cant(self):
         self.assertFalse(Case.objects.for_user(self.user).filter(pk=CaseFactory().pk).exists())
 
@@ -30,11 +34,13 @@ class CaseQuerySetTestCase(TestCase):
         assign_perm('cases.can_view_all', self.user)
         self.assertTrue(Case.objects.for_user(self.user).filter(pk=CaseFactory().pk).exists())
 
-    def test_for_user_can_view_client(self): # perm set by signal
-        self.assertTrue(Case.objects.for_user(self.user).filter(pk=CaseFactory(created_by=self.user).pk).exists())
+    def test_for_assign_can_view_client(self):  # perm set by signal
+        self.assertTrue(Case.objects.for_assign(self.user).filter(
+            pk=CaseFactory(created_by=self.user).pk).exists())
 
-    def test_for_user_can_view_created(self): # perm set by signal
-        self.assertTrue(Case.objects.for_user(self.user).filter(pk=CaseFactory(client=self.user).pk).exists())
+    def test_for_assign_can_view_created(self):  # perm set by signal
+        self.assertTrue(Case.objects.for_assign(self.user).filter(
+            pk=CaseFactory(client=self.user).pk).exists())
 
     def test_with_perm(self):
         CaseFactory.create_batch(size=25)
@@ -55,6 +61,27 @@ class CaseQuerySetTestCase(TestCase):
     def test_by_msg(self):
         # TODO
         self.assertTrue(True)
+
+    def test_order_for_user(self):
+        a = repr(CaseFactory(name="CaseA",
+                             last_action=now() + timedelta(days=0),
+                             last_send=now() + timedelta(days=+1)))
+        b = repr(CaseFactory(name="CaseB",
+                             last_action=now() + timedelta(days=+2),
+                             last_send=now() + timedelta(days=-1)))
+        c = repr(CaseFactory(name="CaseC",
+                             last_action=now() + timedelta(days=-1),
+                             last_send=now() + timedelta(days=+3)))
+        user = UserFactory(is_staff=True)
+        self.assertQuerysetEqual(Case.objects.order_for_user(user, True).all(),
+                                 [c, a, b])
+        self.assertQuerysetEqual(Case.objects.order_for_user(user, False).all(),
+                                 [b, a, c])
+        user = UserFactory(is_staff=False)
+        self.assertQuerysetEqual(Case.objects.order_for_user(user, True).all(),
+                                 [b, a, c])
+        self.assertQuerysetEqual(Case.objects.order_for_user(user, False).all(),
+                                 [c, a, b])
 
 
 class CaseTestCase(TestCase):
@@ -180,9 +207,10 @@ class StaffCaseFilterTestCase(TestCase):
     def test_form_fields(self):
         su_user = UserFactory(is_staff=True, is_superuser=True)
         self.assertEqual(StaffCaseFilter(user=su_user).form.fields.keys(),
-                         ['status', 'handled', 'client', 'name', 'permission', 'o'])
+                         ['status', 'handled', 'id', 'client', 'name', 'has_project', 'permission',
+                          'o'])
         self.assertEqual(StaffCaseFilter(user=UserFactory(is_staff=True)).form.fields.keys(),
-                         ['status', 'handled', 'client', 'name', 'o'])
+                         ['status', 'handled', 'id', 'client', 'name', 'has_project', 'o'])
 
 
 class CaseListViewTestCase(TestCase):
@@ -204,7 +232,10 @@ class CaseAdminTestCase(TestCase):
 
     def assertIsValid(self, model_admin, model):  # See django/tests/modeladmin/tests.py#L602
         admin_obj = model_admin(model, self.site)
-        errors = admin_obj.check(model)
+        if django.VERSION > (1, 9):
+            errors = admin_obj.check()
+        else:
+            errors = admin_obj.check(model)
         expected = []
         self.assertEqual(errors, expected)
 
@@ -255,3 +286,36 @@ class CaseUpdateTestCase(TestCase):
         self.client.post(self.url, data={'name': 'Example nexxw title',
                                          'status': '0'})
         self.assertEqual(len(mail.outbox), 2)
+
+
+class CaseCloseViewTestCase(TestCase):
+    def setUp(self):
+        self.user = UserFactory()
+        self.object = CaseFactory()
+        self.client.login(username=self.user.username, password='pass')
+
+    def test_close_case(self):
+        assign_perm('cases.can_close_case', self.user, self.object)
+        resp = self.client.post(self.object.get_close_url(), {'notify': True})
+        self.assertEqual(
+            resp.context['target'].status,
+            Case.STATUS.closed)
+
+    def test_close_case_not_permitted(self):
+        resp = self.client.get(self.object.get_close_url())
+        self.assertEqual(resp.status_code, 403)
+
+
+class CaseCloseFormTestCase(TestCase):
+    form = CaseCloseForm
+
+    def setUp(self):
+        self.user = UserFactory()
+        self.object = CaseFactory()
+
+    def test_close_notify(self):
+        for value, msg_count in ((False, 0), (True, 1)):
+            form = self.form({'notify': value}, user=self.user, instance=self.object)
+            self.assertEqual(form.is_valid(), True)
+            form.save()
+            self.assertEqual(len(mail.outbox), msg_count)

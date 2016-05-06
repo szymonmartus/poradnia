@@ -1,5 +1,4 @@
-from django.contrib.contenttypes import generic
-from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import Q
@@ -33,15 +32,10 @@ class Record(models.Model):
     event = models.OneToOneField('events.Event', null=True, blank=True)
     alarm = models.OneToOneField('events.Alarm', null=True, blank=True)
 
-    content_type = models.ForeignKey(
-        ContentType,
-        null=True,
-        blank=True,
-    )
-    object_id = models.PositiveIntegerField(
-        null=True,
-    )
-    related_object = generic.GenericForeignKey('content_type', 'object_id')
+    content_type = models.ForeignKey(ContentType, null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True)
+    related_object = GenericForeignKey('content_type', 'object_id')
+
     objects = RecordQuerySet.as_manager()
 
     @property  # We use OneToOneField as possible

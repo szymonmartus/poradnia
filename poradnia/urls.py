@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 from django.conf import settings
-from django.conf.urls import include, patterns, url
+from django.conf.urls import include, url
 from django.conf.urls.static import static
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -12,11 +12,12 @@ from django.views.generic import TemplateView
 
 admin.autodiscover()
 
-urlpatterns = patterns('',
+urlpatterns = [
     url(r'^$',
         TemplateView.as_view(template_name='pages/home.html'),
         name="home"),
     url(r'^admin/', include(admin.site.urls)),
+    url(r'^navsearch/', include('navsearch.urls', namespace="navsearch")),
 
     # User management
     url(r'^uzytkownik/klucze', include('keys.urls', namespace="keys")),
@@ -34,13 +35,14 @@ urlpatterns = patterns('',
     # Utils
     url(r'^autocomplete/', include('autocomplete_light.urls')),
     url(r'^uwagi/', include('tasty_feedback.urls', namespace='tasty_feedback')),
-) + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    url(r'^robots\.txt$', TemplateView.as_view(template_name='robots.txt')),
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-if settings.DEBUG:
-    import debug_toolbar
-    urlpatterns += patterns('',
-                            url(r'^__debug__/', include(debug_toolbar.urls)),
-                            )
+#if settings.DEBUG:
+#    import debug_toolbar
+#    urlpatterns += patterns('',
+#        url(r'^__debug__/', include(debug_toolbar.urls)),
+#    )
 
 
 def handler500(request):

@@ -1,27 +1,26 @@
 from __future__ import print_function, unicode_literals
 
 import os
+from os.path import basename
 
 import claw
 import html2text
-from atom.models import AttachmentBase
+from cases.models import Case
 from claw import quotations
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files import File
 from django.core.urlresolvers import reverse
 from django.db import models
-from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.translation import ugettext_lazy as _
 from django_mailbox.models import Message
 from django_mailbox.signals import message_received
 from model_utils import Choices
 from model_utils.fields import MonitorField, StatusField
-
-from cases.models import Case
 from records.models import AbstractRecord, AbstractRecordQuerySet
 from template_mail.utils import send_tpl_email
+from .utils import date_random_path
 
 claw.init()
 
@@ -118,15 +117,29 @@ class Letter(AbstractRecord):
         ordering = ['-created_on']
 
 
-class Attachment(AttachmentBase):
+class Attachment(models.Model):
     letter = models.ForeignKey(Letter)
+    attachment = models.FileField(upload_to=date_random_path, verbose_name=_("File"))
+
+    @property
+    def filename(self):
+        return basename(self.attachment.name)
+
+    def __unicode__(self):
+        return "%s" % (self.filename)
+
+    def get_absolute_url(self):
+        return self.attachment.url
+
+    class Meta:
+        verbose_name = _('Attachment')
+        verbose_name_plural = _('Attachments')
 
 
 @receiver(message_received)
 def mail_process(sender, message, **args):
-    print ("I just recieved a messsage titled {title} " +
-           "from a mailbox {mbox}".format(title=message.subject.encode('utf-8'),
-                                          mbox=message.mailbox.name))
+    # print ('I just recieved a messsage "{title}"" '.format(title=message.subject.encode('utf-8')) +
+    #        'in mailbox {mbox}'.format(mbox=message.mailbox.name))
     # new_user + poradnia@ => new_user @ new_user
     # new_user + case => FAIL
     # old_user + case => PASS
@@ -146,12 +159,6 @@ def mail_process(sender, message, **args):
     # Identify case
     try:  # TODO: Is it old case?
         case = Case.objects.by_msg(message).get()
-    except Case.MultipleObjectsReturned:  # How many cases?
-        print("Multiple case spam")
-        send_tpl_email(template_name='case/email/case_many.txt',
-                       recipient_list=[message.from_address[0]],
-                       context={'subject': message.subject})
-        return
     except Case.DoesNotExist:
         print("Case creating")
         case = Case(name=message.subject, created_by=user, client=user)

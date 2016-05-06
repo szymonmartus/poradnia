@@ -8,7 +8,7 @@ from django.views.generic import TemplateView, UpdateView
 from django_filters.views import FilterView
 
 from cases.filters import StaffCaseFilter, UserCaseFilter
-from cases.forms import CaseGroupPermissionForm, UpdateCaseForm
+from cases.forms import CaseForm, CaseGroupPermissionForm, CaseCloseForm
 from cases.models import Case
 from cases.utils import notify_update_case_form
 from events.forms import EventForm
@@ -26,28 +26,45 @@ class CaseDetailView(LoginRequiredMixin, TemplateView):  # TODO: Use django.view
         context = {}
         qs = (Case.objects.
               select_related('created_by').
-              select_related('modified_by'))
-        case = get_object_or_404(qs, pk=self.kwargs['pk'])
-        case.view_perm_check(self.request.user)
+              select_related('modified_by').
+              select_related('advice').
+              select_related('deadline'))
+        self.object = get_object_or_404(qs, pk=self.kwargs['pk'])
+        self.object.view_perm_check(self.request.user)
 
         # Readed.update(user=request.user, case=case)
 
-        context['object'] = case
+        context['object'] = self.object
         context['forms'] = {}
         context['forms']['letter'] = {'title': _('Letter'),
-                                      'form': AddLetterForm(user=self.request.user, case=case),
+                                      'form': AddLetterForm(user=self.request.user,
+                                                            case=self.object),
                                       'formset': AttachmentFormSet(instance=None)}
         if self.request.user.is_staff:
             context['forms']['event'] = {'title': _('Event'),
-                                         'form': EventForm(user=self.request.user, case=case)}
-
-        qs = (Record.objects.filter(case=case).for_user(self.request.user).
+                                         'form': EventForm(user=self.request.user,
+                                                           case=self.object)}
+        qs = (Record.objects.filter(case=self.object).for_user(self.request.user).
               select_related('letter__created_by', 'letter', 'letter__modified_by').
               select_related('event__created_by', 'event', 'event__modified_by').
               select_related('event__alarm').
               prefetch_related('letter__attachment_set'))
         context['record_list'] = qs.all()
-        context['casegroup_form'] = CaseGroupPermissionForm(case=case, user=self.request.user)
+        context['casegroup_form'] = CaseGroupPermissionForm(case=self.object,
+                                                            user=self.request.user)
+
+        # Get next or prev objects
+        try:
+            context['next'] = self.object.get_next_for_user(self.request.user)
+        except Case.DoesNotExist:
+            context['next'] = None
+
+        # Get next or prev objects
+        try:
+            context['previous'] = self.object.get_prev_for_user(self.request.user)
+        except Case.DoesNotExist:
+            context['previous'] = None
+
         return context
 
 
@@ -65,7 +82,7 @@ class CaseListView(PermissionMixin, FilterView):
 
     def get_queryset(self, *args, **kwargs):  # TODO: Mixins
         qs = super(CaseListView, self).get_queryset(*args, **kwargs)
-        qs = qs.select_related('client').prefetch_related('tags')
+        qs = qs.select_related('client')
         if self.request.user.is_staff:
             qs = qs.with_involved_staff()
         return qs
@@ -77,7 +94,7 @@ class CaseListView(PermissionMixin, FilterView):
 
 
 class CaseUpdateView(UserFormKwargsMixin, UpdateView):
-    form_class = UpdateCaseForm
+    form_class = CaseForm
     template_name = 'cases/case_form.html'
     model = Case
 
@@ -96,3 +113,19 @@ class CaseUpdateView(UserFormKwargsMixin, UpdateView):
         messages.success(self.request, _('Successful updated "%(object)s".') %
                          {'object': form.instance})
         return redirect(form.instance)
+
+
+class CaseCloseView(UserFormKwargsMixin, UpdateView):
+    form_class = CaseCloseForm
+    template_name = 'cases/case_close.html'
+    model = Case
+
+    def get_object(self):
+        obj = super(CaseCloseView, self).get_object()
+        obj.perm_check(self.request.user, 'can_close_case')
+        return obj
+
+    def form_valid(self, form):
+        obj = form.save()
+        messages.success(self.request, _('Successfully closed "%(object)s".') % {'object': obj})
+        return redirect(obj)

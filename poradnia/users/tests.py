@@ -2,14 +2,15 @@ from __future__ import absolute_import
 
 from django.core import mail
 from django.core.urlresolvers import reverse_lazy
-from django.test import RequestFactory, TestCase
-from guardian.shortcuts import assign_perm
+from django.test import TestCase
+from guardian.shortcuts import assign_perm, get_perms
 
 from cases.factories import CaseFactory
+from cases.models import Case
 from users.factories import UserFactory
+from users.forms import TranslatedUserObjectPermissionsForm
 from users.forms import UserForm
 from users.models import User
-from users.views import UserListView
 
 
 class UserTestCase(TestCase):
@@ -27,12 +28,17 @@ class UserTestCase(TestCase):
         self.assertEqual(username, username)
         User.objects.create_user(username=username)
 
-    def test_email_to_username(self):
+    def test_emaTeil_to_username(self):
         self._create_user('example@example.com', 'example_example_com')
         for i in range(1, 11):
             self._create_user('example@example.com', 'example_example_com-' + str(i))
         with self.assertRaises(ValueError):
             self._create_user('example@example.com', 'example_example_com-11')
+
+    def test_login_email(self):  # Test for regresion #204
+        max_length = User._meta.get_field('username').max_length
+        email = 'very-long-email-which-make-broken-username@example.com'
+        self.assertLessEqual(len(User.objects.email_to_unique_username(email)), max_length)
 
     def test_has_picture(self):
         self.assertTrue(UserFactory().picture)
@@ -72,13 +78,23 @@ class UserQuerySetTestCase(TestCase):
 
     def test_with_case_count_assigned(self):
         user = UserFactory()
-        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned, 0)
-        for obj in CaseFactory.create_batch(size=5):
-            assign_perm('cases.can_view', user, obj)
-        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned, 5)
-        for obj in CaseFactory.create_batch(size=5):
-            assign_perm('cases.can_view', user, obj)
-        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned, 10)
+        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned_sum, 0)
+
+        for size, status in [(1, Case.STATUS.free), (2, Case.STATUS.assigned), (3, Case.STATUS.closed)]:
+            for obj in CaseFactory.create_batch(size=size, status=status):
+                assign_perm('cases.can_view', user, obj)
+        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned_free, 1)
+        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned_active, 2)
+        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned_closed, 3)
+        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned_sum, 6)
+
+        for size, status in [(4, Case.STATUS.free), (5, Case.STATUS.assigned), (6, Case.STATUS.closed)]:
+            for obj in CaseFactory.create_batch(size=size, status=status):
+                assign_perm('cases.can_view', user, obj)
+        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned_free, 5)
+        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned_active, 7)
+        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned_closed, 9)
+        self.assertEqual(User.objects.with_case_count_assigned().get(pk=user.pk).case_assigned_sum, 21)
 
     def _register_email_count(self, notify, count):
         u = User.objects.register_email(email='sarah@example.com', notify=notify)
@@ -125,7 +141,7 @@ class UserDetailViewTestCase(TestCase):
         self.assertContains(self.own_resp(), self.object.username)
 
     def test_contains_assigned_cases(self):
-        url = reverse_lazy('cases:list') + '?permission='+str(self.object.pk)
+        url = reverse_lazy('cases:list') + '?permission=' + str(self.object.pk)
         self.login()
         self.assertNotContains(self.own_resp(), url)
 
@@ -212,3 +228,20 @@ class LoginPageTestCase(TestCase):
         self.assertContains(resp, '<form ')
         self.assertContains(resp, 'login')
         self.assertContains(resp, 'password')
+
+
+class TranslatedUserObjectPermissionsFormTestCase(TestCase):
+    def setUp(self):
+        self.obj = UserFactory()
+        self.user = UserFactory()
+
+    def test_delete_all_permissions(self):
+        assign_perm('users.change_user', self.user, self.obj)
+        self.assertTrue(self.user.has_perm('users.change_user', self.obj))
+        form = TranslatedUserObjectPermissionsForm(data={'permissions': ''},
+                                                   user=self.user,
+                                                   obj=self.obj)
+        self.assertTrue(form.is_valid())
+        form.save_obj_perms()
+        self.assertFalse(self.user.has_perm('users.change_user', self.obj))
+        self.assertEqual(get_perms(self.user, self.obj), [])

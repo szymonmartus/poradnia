@@ -15,20 +15,22 @@ from guardian.shortcuts import assign_perm, get_users_with_perms
 from model_utils import Choices
 from model_utils.fields import MonitorField, StatusField
 
-from cases.tags.models import Tag
 from cases.utils import get_user_model
 from template_mail.utils import send_tpl_email
 
 
 class CaseQuerySet(QuerySet):
 
-    def for_user(self, user):
-        if user.has_perm('cases.can_view_all'):
-            return self
+    def for_assign(self, user):
         content_type = ContentType.objects.get_for_model(Case)
         return self.filter(caseuserobjectpermission__permission__codename='can_view',
                            caseuserobjectpermission__permission__content_type=content_type,
                            caseuserobjectpermission__user=user)
+
+    def for_user(self, user):
+        if user.has_perm('cases.can_view_all'):
+            return self
+        return self.for_assign(user)
 
     def with_perm(self):
         return self.prefetch_related('caseuserobjectpermission_set')
@@ -51,25 +53,32 @@ class CaseQuerySet(QuerySet):
         return self.filter(condition)
 
     def by_msg(self, message):
-        cond = Q()
-        # Assosiate by email
-        for email in message.to_addresses:
-            import re
-            result = re.match('^sprawa-(?P<pk>\d+)@porady.siecobywatelska.pl$', email)
-            if result:
-                cond = cond | Q(pk=result.group('pk'))
-        if not cond.children:
+        envelope = message.get_email_object().get('Envelope-To')
+        result = match('^sprawa-(?P<pk>\d+)@porady.siecobywatelska.pl$', envelope)
+        if result:
+            return self.filter(pk=result.group('pk'))
+        else:
             return self.none()
-        return self.filter(cond)
+
+    def order_for_user(self, user, is_next):
+        order = '' if is_next else '-'
+        if user.is_staff:
+            field_name = self.model.STAFF_ORDER_DEFAULT_FIELD
+        else:
+            field_name = self.model.USER_ORDER_DEFAULT_FIELD
+        return self.order_by(
+            '%s%s' % (order, field_name), '%spk' % order
+        )
 
 
 class Case(models.Model):
+    STAFF_ORDER_DEFAULT_FIELD = 'last_action'
+    USER_ORDER_DEFAULT_FIELD = 'last_send'
     STATUS = Choices(('0', 'free', _('free')),
                      ('1', 'assigned', _('assigned')),
                      ('2', 'closed', _('closed'))
                      )
     name = models.CharField(max_length=150, verbose_name=_("Subject"))
-    tags = models.ManyToManyField(Tag, blank=True, verbose_name=_("Tags"))
     status = StatusField()
     status_changed = MonitorField(monitor='status')
     client = models.ForeignKey(
@@ -121,6 +130,9 @@ class Case(models.Model):
             qs = qs.exclude(pk=exclude_pk)
         return qs
 
+    def get_close_url(self):
+        return reverse('cases:close', kwargs={'pk': str(self.pk)})
+
     def __unicode__(self):
         return self.name
 
@@ -159,6 +171,7 @@ class Case(models.Model):
                        ('can_add_record', _('Can add record')),
                        ('can_change_own_record', _("Can change own records")),
                        ('can_change_all_record', _("Can change all records")),
+                       ('can_close_case', _("Can close case"))
                        )
 
     def update_handled(self):
@@ -238,6 +251,35 @@ class Case(models.Model):
                         from_email=self.get_email(),
                         **context)
 
+    def get_next_for_user(self, user, **kwargs):
+        return self.get_next_or_prev_for_user(is_next=True, user=user)
+
+    def get_prev_for_user(self, user, **kwargs):
+        return self.get_next_or_prev_for_user(is_next=False, user=user)
+
+    def get_next_or_prev_for_user(self, is_next, user, **kwargs):
+        op = 'gt' if is_next else 'lt'
+        if user.is_staff:
+            field_name = self.STAFF_ORDER_DEFAULT_FIELD
+        else:
+            field_name = self.USER_ORDER_DEFAULT_FIELD
+        param = getattr(self, field_name)
+        q = Q()
+        if param:
+            q = q | Q(**{'%s__%s' % (field_name, op): param})
+        if self.pk:
+            q = q | Q(**{field_name: param, 'pk__%s' % op: self.pk})
+        manager = self.__class__._default_manager.using(self._state.db).filter(**kwargs)
+        qs = manager.filter(q)
+        qs = qs.order_for_user(user=user, is_next=is_next)
+        qs = qs.for_user(user)
+
+        try:
+            return qs[0]
+        except IndexError:
+            raise self.DoesNotExist("%s matching query does not exist." %
+                                    self.__class__._meta.object_name)
+
 
 class CaseUserObjectPermission(UserObjectPermissionBase):
     content_object = models.ForeignKey(Case)
@@ -257,7 +299,7 @@ class CaseGroupObjectPermission(GroupObjectPermissionBase):
     content_object = models.ForeignKey(Case)
 
 
-limit = {'content_type__app_label': 'cases', 'content_type__name': 'case'}
+limit = {'content_type__app_label': 'cases', 'content_type__model': 'case'}
 
 
 class PermissionGroup(models.Model):

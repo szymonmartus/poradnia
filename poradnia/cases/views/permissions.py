@@ -10,6 +10,8 @@ from django.views.generic import FormView
 from django.views.generic.detail import SingleObjectMixin
 from djmail.template_mail import MagicMailBuilder
 
+from guardian.shortcuts import get_perms
+
 from users.forms import TranslatedManageObjectPermissionForm, TranslatedUserObjectPermissionsForm
 
 from ..forms import CaseGroupPermissionForm
@@ -74,14 +76,20 @@ class UserPermissionUpdateView(FormValidMessageMixin, FormView):
         assign_perm_check(self.request.user, self.case)
         self.action_user = get_object_or_404(get_user_model(), username=self.kwargs['username'])
         kwargs.update({'user': self.action_user, 'obj': self.case})
+        del kwargs['initial']
         return kwargs
+
+    def get_obj_perms_field_initial(self, *args, **kwargs):
+        return get_perms(self.action_user, self.case)
 
     def get_context_data(self, **kwargs):
         context = super(UserPermissionUpdateView, self).get_context_data(**kwargs)
         context['object'] = self.case
+        context['action_user'] = self.action_user
         return context
 
     def form_valid(self, form, *args, **kwargs):
+        form.save_obj_perms()
         context = {'actor': self.request.user,
                    'case': self.case,
                    'user': self.action_user}
