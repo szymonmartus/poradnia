@@ -7,6 +7,7 @@ Local Configurations
 - Use Django Debug Toolbar
 '''
 from .common import *  # noqa
+import os
 
 # DEBUG
 DEBUG = env('DEBUG', default=True)
@@ -49,3 +50,27 @@ DEBUG_TOOLBAR_CONFIG = {
     ],
     'SHOW_TEMPLATE_CONTEXT': True,
 }
+
+
+if env.bool('SQL_LOG', default=False):
+    LOGGING = {
+        'version': 1,
+        'filters': {
+            'require_debug_true': {
+                '()': 'django.utils.log.RequireDebugTrue',
+            }
+        },
+        'handlers': {
+            'console': {
+                'level': 'DEBUG',
+                'filters': ['require_debug_true'],
+                'class': 'logging.StreamHandler',
+            }
+        },
+        'loggers': {
+            'django.db.backends': {
+                'level': 'DEBUG',
+                'handlers': ['console'],
+            }
+        }
+    }
