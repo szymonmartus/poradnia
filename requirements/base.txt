@@ -44,3 +44,4 @@ pyGravatar==0.0.6
 djmail==0.12.0.0.post1
 django-bootstrap-pagination==1.6.1
 raven==5.13.0
+https://bitbucket.org/ad_m/django-bleach/get/6011e84.tar.gz

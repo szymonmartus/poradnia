@@ -49,6 +49,7 @@ THIRD_PARTY_APPS = (
     'sorl.thumbnail',
     'atom',
     'djmail',
+    'django_bleach',
 )
 
 # Apps specific for this project go here.
@@ -333,4 +334,30 @@ TEMPLATES = [
         },
     },
 ]
+
+# django-filters
 FILTERS_HELP_TEXT_FILTER = False
+
+
+# django-bleach
+BLEACH_ALLOWED_TAGS = [
+    # bleach default
+    'a',
+    'abbr',
+    'acronym',
+    'b',
+    'blockquote',
+    'code',
+    'em',
+    'i',
+    'li',
+    'ol',
+    'strong',
+    'ul',
+    # extra
+    'br',
+    'p',
+    'u',
+    'div',
+]
+BLEACH_DEFAULT_WIDGET = 'tinymce.models.HTMLField'
