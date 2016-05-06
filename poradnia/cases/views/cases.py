@@ -54,16 +54,8 @@ class CaseDetailView(LoginRequiredMixin, TemplateView):  # TODO: Use django.view
                                                             user=self.request.user)
 
         # Get next or prev objects
-        try:
-            context['next'] = self.object.get_next_for_user(self.request.user)
-        except Case.DoesNotExist:
-            context['next'] = None
-
-        # Get next or prev objects
-        try:
-            context['previous'] = self.object.get_prev_for_user(self.request.user)
-        except Case.DoesNotExist:
-            context['previous'] = None
+        context['next'] = self.object.get_next_for_user(self.request.user).first()
+        context['previous'] = self.object.get_prev_for_user(self.request.user).first()
 
         return context
 
