@@ -7,7 +7,7 @@ from users.factories import UserFactory
 class CaseFactory(factory.django.DjangoModelFactory):
     name = factory.fuzzy.FuzzyText()
     client = factory.SubFactory(UserFactory)
-    created_by = factory.LazyAttribute(lambda obj: obj.client)
+    created_by = factory.LazyAttribute(lambda obj: obj.client or UserFactory())
 
     class Meta:
         model = 'cases.Case'

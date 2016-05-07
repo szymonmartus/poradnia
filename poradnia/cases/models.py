@@ -10,13 +10,13 @@ from django.db.models import Q, Count, Prefetch
 from django.db.models.query import QuerySet
 from django.db.models.signals import post_save
 from django.utils.translation import ugettext_lazy as _
+from djmail import template_mail
 from guardian.models import GroupObjectPermissionBase, UserObjectPermissionBase
 from guardian.shortcuts import assign_perm, get_users_with_perms
 from model_utils import Choices
 from model_utils.fields import MonitorField, StatusField
 
 from cases.utils import get_user_model
-from template_mail.utils import send_tpl_email
 
 
 class CaseQuerySet(QuerySet):
@@ -122,13 +122,11 @@ class Case(models.Model):
     def get_edit_url(self):
         return reverse('cases:edit', kwargs={'pk': str(self.pk)})
 
-    def get_users_with_perms(self, is_staff=None, exclude_pk=None, *args, **kwargs):
-        qs = get_users_with_perms(self, with_group_users=False, *args, **kwargs)
-        if is_staff is not None:
-            qs = qs.filter(is_staff=is_staff)
-        if exclude_pk:
-            qs = qs.exclude(pk=exclude_pk)
-        return qs
+    def get_users(self, filters=None, excludes=None):
+        qs = get_users_with_perms(self, with_group_users=False)
+        filters = filters or {}
+        excludes = excludes or {}
+        return qs.filter(**filters).exclude(**excludes)
 
     def get_close_url(self):
         return reverse('cases:close', kwargs={'pk': str(self.pk)})
@@ -137,8 +135,10 @@ class Case(models.Model):
         return self.name
 
     def get_email(self, user=None):
-        if user:
-            return "%s <%s>" % (user, self.get_email())
+        return "%s <%s>" % (user, self.from_email) if user else self.from_email
+
+    @property
+    def from_email(self):
         return settings.PORADNIA_EMAIL_OUTPUT % self.__dict__
 
     @classmethod
@@ -238,19 +238,6 @@ class Case(models.Model):
             assign_perm('can_view', self.client, self)  # assign client
             assign_perm('can_add_record', self.client, self)  # assign client
 
-    # TODO: Remove
-    def send_notification(self, actor, target=None, staff=None, **context):
-        qs = self.get_users_with_perms().exclude(pk=actor.pk)
-        if staff is not None:
-            qs = qs.filter(is_staff=staff)
-        if target is None:
-            target = self
-        for user in qs:
-            user.notify(actor=actor,
-                        target=target,
-                        from_email=self.get_email(),
-                        **context)
-
     def get_next_for_user(self, user, **kwargs):
         return self.get_next_or_prev_for_user(is_next=True, user=user)
 
@@ -272,13 +259,7 @@ class Case(models.Model):
         manager = self.__class__._default_manager.using(self._state.db).filter(**kwargs)
         qs = manager.filter(q)
         qs = qs.order_for_user(user=user, is_next=is_next)
-        qs = qs.for_user(user)
-
-        try:
-            return qs[0]
-        except IndexError:
-            raise self.DoesNotExist("%s matching query does not exist." %
-                                    self.__class__._meta.object_name)
+        qs = qs.for_user(user).first()
 
 
 class CaseUserObjectPermission(UserObjectPermissionBase):
@@ -315,14 +296,15 @@ class PermissionGroup(models.Model):
 
 def notify_new_case(sender, instance, created, **kwargs):
     if created:
+        mails = template_mail.MagicMailBuilder()
+
         User = get_user_model()
         content_type = ContentType.objects.get_for_model(Case)
         users = User.objects.filter(user_permissions__codename='can_view_all',
                                     user_permissions__content_type=content_type).all()
-        email = [x.email for x in users]
-        send_tpl_email('cases/email/case_new.html',
-                       recipient_list=email,
-                       context={'case': instance})
+        for user in users:
+            email = mails.case_new(user, {'case': instance})
+            email.send()
 
 post_save.connect(notify_new_case, sender=Case, dispatch_uid="new_case_notify")
 

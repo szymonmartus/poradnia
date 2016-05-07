@@ -1,0 +1,6 @@
+{% extends 'emails/_case_base-body-html.html' %}
+
+{% block msg %}
+<p>W systemie Poradnia została nowa sprawa. Przejdź pod adres http://poradnia.siecobywatelska.pl/{{case.get_absolute_url}}, aby się z nią zapoznać.</p>
+{% endblock %}
+

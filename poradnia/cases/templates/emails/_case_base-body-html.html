@@ -3,5 +3,5 @@
 {% block msg %}
 {% endblock %}
 <p>Zapoznaj się z aktami sprawy pod adresem <a href="http://porady.siecobywatelska.pl{{case.get_absolute_url}}">http://porady.siecobywatelska.pl{{case.get_absolute_url}}</a>.</p>
-<p>Prosimy, używaj adresu {{case.get_email}} do korespondencji w tej sprawie. Dzięki temu wymiana korespondencji będzie sprawniejsza. Dziękujemy za współpracę.</p>
+<p>Prosimy, używaj adresu {{case.from_email}} do korespondencji w tej sprawie. Dzięki temu wymiana korespondencji będzie sprawniejsza. Dziękujemy za współpracę.</p>
 {% endblock %}

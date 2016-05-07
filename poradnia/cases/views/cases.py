@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from braces.views import LoginRequiredMixin, UserFormKwargsMixin
+from braces.views import LoginRequiredMixin, UserFormKwargsMixin, SelectRelatedMixin
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.translation import ugettext as _
@@ -10,7 +10,6 @@ from django_filters.views import FilterView
 from cases.filters import StaffCaseFilter, UserCaseFilter
 from cases.forms import CaseForm, CaseGroupPermissionForm, CaseCloseForm
 from cases.models import Case
-from cases.utils import notify_update_case_form
 from events.forms import EventForm
 from letters.forms import AddLetterForm
 from letters.helpers import AttachmentFormSet
@@ -31,8 +30,6 @@ class CaseDetailView(LoginRequiredMixin, TemplateView):  # TODO: Use django.view
               select_related('deadline'))
         self.object = get_object_or_404(qs, pk=self.kwargs['pk'])
         self.object.view_perm_check(self.request.user)
-
-        # Readed.update(user=request.user, case=case)
 
         context['object'] = self.object
         context['forms'] = {}
@@ -68,9 +65,10 @@ class CaseDetailView(LoginRequiredMixin, TemplateView):  # TODO: Use django.view
         return context
 
 
-class CaseListView(PermissionMixin, FilterView):
+class CaseListView(PermissionMixin, SelectRelatedMixin, FilterView):
     model = Case
     paginate_by = 25
+    select_related = ['client', ]
 
     def get_filterset_class(self, *args, **kwargs):
         return StaffCaseFilter if self.request.user.is_staff else UserCaseFilter
@@ -82,7 +80,6 @@ class CaseListView(PermissionMixin, FilterView):
 
     def get_queryset(self, *args, **kwargs):  # TODO: Mixins
         qs = super(CaseListView, self).get_queryset(*args, **kwargs)
-        qs = qs.select_related('client')
         if self.request.user.is_staff:
             qs = qs.with_involved_staff()
         return qs
@@ -105,11 +102,6 @@ class CaseUpdateView(UserFormKwargsMixin, UpdateView):
 
     def form_valid(self, form):
         form.save()
-        notify_update_case_form(name='case_update',
-                                actor=self.request.user,
-                                is_staff=True,
-                                case=form.instance,
-                                form=form)
         messages.success(self.request, _('Successful updated "%(object)s".') %
                          {'object': form.instance})
         return redirect(form.instance)

@@ -8,28 +8,51 @@ from django.contrib.auth import get_user_model
 from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext_lazy as _
 from guardian.shortcuts import assign_perm
-
+from djmail.template_mail import MagicMailBuilder
 from .models import Case, PermissionGroup
 
 
 class CaseForm(UserKwargModelFormMixin, FormHorizontalMixin, SingleButtonMixin,
                forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super(CaseForm, self).__init__(*args, **kwargs)
-        self.helper.form_action = reverse('cases:edit', kwargs={'pk': str(self.instance.pk)})
+
+    @property
+    def changed_data_labels(self):
+        return [self.fields[key].label for key in self.changed_data]
+
+    def _process_new(self):
+        # Update object
+        self.instance.created_by = self.user
+
+        # Send notification
+        mails = MagicMailBuilder()
+        context = {"actor": self.user,
+                   "case": self.instance,
+                   "changed_labels": self.changed_data_labels}
+        for user in self.instance.get_users({'is_staff': True}).all():
+            mails.case_new(user, context,
+                           from_email=self.instance.get_email(self.user)).send()
+
+    def _process_update(self):
+        # Send notification
+        self.instance.modified_by = self.user
+
+        # Update object
+        mails = MagicMailBuilder()
+        context = {"actor": self.user,
+                   "case": self.instance,
+                   "changed_labels": self.changed_data_labels}
+        for user in self.instance.get_users({'is_staff': True}).all():
+            mails.case_update(user, context,
+                              from_email=self.instance.get_email(self.user)).send()
 
     def save(self, commit=True, *args, **kwargs):
-        obj = super(CaseForm, self).save(commit=False, *args, **kwargs)
-        if obj.pk:  # old
-            obj.modified_by = self.user
-            if obj.status == Case.STATUS.assigned:
-                obj.send_notification(self.user, staff=True, verb='updated')
+        is_new = self.instance.pk is None
+        super(CaseForm, self).save(*args, **kwargs)
+        if is_new:  # old
+            self._process_new()
         else:  # new
-            obj.send_notification(self.user, staff=True, verb='created')
-            obj.created_by = self.user
-        if commit:
-            obj.save()
-        return obj
+            self._process_update()
+        return self.instance
 
     class Meta:
         model = Case
@@ -70,7 +93,6 @@ class CaseGroupPermissionForm(HelperMixin, forms.Form):
 
 
 class CaseCloseForm(UserKwargModelFormMixin, HelperMixin, forms.ModelForm):
-
     notify = forms.BooleanField(required=False, label=_("Notify user"))
 
     def __init__(self, *args, **kwargs):
@@ -82,10 +104,13 @@ class CaseCloseForm(UserKwargModelFormMixin, HelperMixin, forms.ModelForm):
         self.instance.modified_by = self.user
         self.instance.status = Case.STATUS.closed
 
-    def save(self, commit=True, *args, **kwargs):
+    def save(self, *args, **kwargs):
         if self.cleaned_data['notify']:
-            self.instance.send_notification(self.user, staff=False, verb='closed')
-        return super(CaseCloseForm, self).save(commit=True, *args, **kwargs)
+            mails = MagicMailBuilder()
+            context = {"actor": self.user, 'case': self.instance}
+            for user in self.instance.get_users():
+                mails.case_close(user, context).send()
+        return super(CaseCloseForm, self).save(*args, **kwargs)
 
     class Meta:
         model = Case

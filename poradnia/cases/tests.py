@@ -13,7 +13,7 @@ from guardian.shortcuts import assign_perm
 from cases.admin import CaseAdmin
 from cases.factories import CaseFactory
 from cases.filters import StaffCaseFilter
-from cases.forms import CaseCloseForm
+from cases.forms import CaseCloseForm, CaseForm
 from cases.models import Case
 from letters.factories import LetterFactory
 from letters.models import Letter
@@ -227,6 +227,8 @@ class CaseListViewTestCase(TestCase):
 
 
 class CaseAdminTestCase(TestCase):
+    admin = CaseAdmin
+
     def setUp(self):
         self.site = AdminSite()
 
@@ -240,12 +242,12 @@ class CaseAdminTestCase(TestCase):
         self.assertEqual(errors, expected)
 
     def test_is_valid(self):
-        self.assertIsValid(CaseAdmin, Case)
+        self.assertIsValid(self.admin, Case)
 
     def test_record_count(self):
         case = CaseFactory()
         LetterFactory.create_batch(size=25, case=case)
-        admin_obj = CaseAdmin(Case, AdminSite())
+        admin_obj = self.admin(Case, AdminSite())
         request = RequestFactory().get(reverse_lazy('admin:cases_case_changelist'))
         request.user = UserFactory(is_staff=True, is_superuser=True)
         qs = admin_obj.get_queryset(request)
@@ -284,7 +286,7 @@ class CaseUpdateTestCase(TestCase):
         self._make_user(is_staff=True)
         self._make_user()
         self.client.post(self.url, data={'name': 'Example nexxw title',
-                                         'status': '0'})
+                                         'status': Case.STATUS.assigned})
         self.assertEqual(len(mail.outbox), 2)
 
 
@@ -297,13 +299,57 @@ class CaseCloseViewTestCase(TestCase):
     def test_close_case(self):
         assign_perm('cases.can_close_case', self.user, self.object)
         resp = self.client.post(self.object.get_close_url(), {'notify': True})
-        self.assertEqual(
-            resp.context['target'].status,
-            Case.STATUS.closed)
+        self.assertEqual(resp.status_code, 302)
+        self.object.refresh_from_db()
+        self.assertEqual(self.object.status, Case.STATUS.closed)
 
     def test_close_case_not_permitted(self):
         resp = self.client.get(self.object.get_close_url())
         self.assertEqual(resp.status_code, 403)
+
+
+class CaseFormTestCase(TestCase):
+    form = CaseForm
+
+    def setUp(self):
+        self.user = UserFactory()
+        self.object = CaseFactory(status=Case.STATUS.closed)
+        self.staff = UserFactory(is_staff=True)
+
+    def test_changed_data_labels(self):
+        form = self.form(data={'name': 'xxxx',
+                               'status': self.object.status,
+                               'has_project': self.object.has_project},
+                         instance=self.object)
+        self.assertEqual(form.is_valid(), True)
+        self.assertEqual(form.changed_data, ['name'])
+        self.assertEqual(len(form.changed_data_labels), 1)
+
+    def test_process_new(self):
+        assign_perm('cases.can_close_case', self.staff, self.object)
+
+        form = self.form(data={'name': 'XXX',
+                               'status': 2,
+                               'has_project': False},
+                         user=self.user)
+        form.instance.client = UserFactory()
+        form.instance.created_by = UserFactory()
+        self.assertEqual(form.is_valid(), True)
+        obj = form.save()
+        self.assertEqual(obj.created_by, self.user)
+
+    def test_process_update(self):
+        assign_perm('cases.can_view', self.staff, self.object)
+
+        form = self.form(data={'name': 'XXX',
+                               'status': Case.STATUS.assigned,
+                               'has_project': self.object.has_project},
+                         user=self.user,
+                         instance=self.object)
+        self.assertEqual(form.is_valid(), True)
+        obj = form.save()
+        self.assertEqual(obj.modified_by, self.user)
+        self.assertEqual(len(mail.outbox), 1)  # staff
 
 
 class CaseCloseFormTestCase(TestCase):
@@ -313,9 +359,12 @@ class CaseCloseFormTestCase(TestCase):
         self.user = UserFactory()
         self.object = CaseFactory()
 
+    def _close_notify(self, value, msg_count):
+        form = self.form({'notify': value}, user=self.user, instance=self.object)
+        self.assertEqual(form.is_valid(), True)
+        form.save()
+        self.assertEqual(len(mail.outbox), msg_count)
+
     def test_close_notify(self):
-        for value, msg_count in ((False, 0), (True, 1)):
-            form = self.form({'notify': value}, user=self.user, instance=self.object)
-            self.assertEqual(form.is_valid(), True)
-            form.save()
-            self.assertEqual(len(mail.outbox), msg_count)
+        self._close_notify(True, 1)  # client
+        self._close_notify(False, 1)  # nobody
