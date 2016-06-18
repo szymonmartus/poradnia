@@ -57,6 +57,10 @@ class QuerySetTestCase(TestCase):
                        is_superuser=False,
                        is_staff=False)
 
+    def test_client_visible(self):
+        self.assertEqual(LetterFactory(status=Letter.STATUS.staff).client_visible, False)
+        self.assertEqual(LetterFactory(status=Letter.STATUS.done).client_visible, True)
+
 
 class LastQuerySetTestCase(TestCase):
     def setUp(self):

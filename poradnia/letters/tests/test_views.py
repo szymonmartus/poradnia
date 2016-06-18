@@ -24,15 +24,6 @@ class NewCaseMixin(CaseMixin):
     template_name = 'letters/form_new.html'
     fields = None
 
-    def assertSendTemplate(self, template_name):
-        templates = {msg.extra_headers['Template'] for msg in mail.outbox
-                     if 'Template' in msg.extra_headers}
-        if template_name in templates:
-            return True
-        template_list = ", ".join(templates)
-        self.fail("Mail with template {name} wasn't send (used {tpls}).".format(name=template_name,
-                                                                                tpls=template_list))
-
     def post(self, data=None):
         return self.client.post(self.url, data=data or self.get_data())
 
@@ -67,11 +58,11 @@ class NewCaseAnonymousTestCase(NewCaseMixin, TestCase):
 
     def test_user_registration(self):
         self.post()
-        self.assertSendTemplate('users/email_new_user.html')
+        self.assertIn("Rejestracja", mail.outbox[0].subject)
 
     def test_user_notification(self):
         self.post()
-        self.assertSendTemplate('cases/email/case_registered.txt')
+        self.assertIn("Nowa sprawa", mail.outbox[1].subject)
 
     def test_case_exists(self):
         self.post()
@@ -133,12 +124,12 @@ class AdminNewCaseTestCase(NewCaseMixin, TestCase):
 
     def test_user_registration(self):
         self.post()
-        self.assertSendTemplate('users/email_new_user.html')
+        self.assertIn(self.email, mail.outbox[0].to)
+        self.assertIn("Rejestracja", mail.outbox[0].subject)
 
     def test_user_notification(self):
         self.post()
-        self.assertEqual(mail.outbox[1].extra_headers['Template'],
-                         'cases/email/case_registered.txt')
+        self.assertIn("Nowa sprawa", mail.outbox[1].subject)
         self.assertIn(self.email, mail.outbox[1].to)
 
 
@@ -171,8 +162,7 @@ class UserNewCaseTestCase(NewCaseMixin, TestCase):
 
     def test_user_self_notify(self):
         self.post()
-        self.assertEqual(mail.outbox[0].extra_headers['Template'],
-                         'cases/email/case_registered.txt')
+        self.assertIn('Nowa sprawa', mail.outbox[0].subject)
         self.assertIn(self.user.email, mail.outbox[0].to)
 
 
@@ -191,6 +181,7 @@ class AddLetterTestCase(CaseMixin, TestCase):
 
     def setUp(self):
         self.case = CaseFactory(handled=False)
+        self.user = UserFactory()
         self.url = reverse('letters:add', kwargs={'case_pk': self.case.pk})
 
     def post(self, data=None):
@@ -250,8 +241,7 @@ class AddLetterTestCase(CaseMixin, TestCase):
         user_staff = self._add_random_user(self.case, staff=True)
         func()
         self.assertEqual(Letter.objects.get().status, status)
-        emails = [x.to[0] for x in mail.outbox
-                  if x.extra_headers['Template'] == 'letters/email/letter_created.txt']
+        emails = [x.to[0] for x in mail.outbox]
         self.assertEqual(user_user.email in emails, user_notify)
         self.assertEqual(user_staff.email in emails, staff_notify)
 
@@ -260,6 +250,21 @@ class AddLetterTestCase(CaseMixin, TestCase):
 
     def test_email_make_staff(self):
         self._test_email(self.test_status_field_staff_can_send_staff, Letter.STATUS.staff, False)
+
+    def test_auth_no_login(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 302)
+
+    def test_auth_no_permission(self):
+        self.client.login(username=self.user.username, password='pass')
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 403)
+
+    def test_auth_permitted(self):
+        assign_perm('can_add_record', self.user, self.case)
+        self.client.login(username=self.user.username, password='pass')
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
 
 
 class ProjectAddLetterTestCase(CaseMixin, TestCase):
@@ -333,8 +338,7 @@ class SendLetterTestCase(CaseMixin, TestCase):
 
         self._test_send()
 
-        emails = [x.to[0] for x in mail.outbox
-                  if x.extra_headers['Template'] == 'letters/email/letter_drop_a_note.txt']
+        emails = [x.to[0] for x in mail.outbox]
         self.assertEqual(user1.email in emails, True)
         self.assertEqual(user2.email in emails, False)
 
@@ -344,8 +348,7 @@ class SendLetterTestCase(CaseMixin, TestCase):
 
         self._test_send()
 
-        emails = [x.to[0] for x in mail.outbox
-                  if x.extra_headers['Template'] == 'letters/email/letter_send_to_client.txt']
+        emails = [x.to[0] for x in mail.outbox]
         self.assertEqual(user1.email in emails, True)
         self.assertEqual(user2.email in emails, True)
 

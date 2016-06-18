@@ -1,14 +1,13 @@
-{{actor}}: {{target.name}}
-{{actor}} napisał:
-{{target.text}}
+<p>{{actor}} napisał:</p>
+{{letter.text | safe}}
 
-{% if target.attachment_set.all %}
-Załączniki pisma:{% for att in target.attachment_set.all %}
-- http://porady.siecobywatelska.pl/{{att.get_absolute_url}}
+{% if attachments %}
+<p>Załączniki pisma:</p>
+<ul>
+{% for att in attachments %}
+    <li>http://porady.siecobywatelska.pl/{{att.get_absolute_url}}</li>
 {% endfor %}
+</ul>
 {% endif %}
-
-Zapoznaj się z aktami sprawy pod adresem http://porady.siecobywatelska.pl/{{target.case_get_absolute_url}}.
-
-
-{% if email %}Używaj adresu {{email}} do korespondencji w tej sprawie, dzięki temu wymiana korespondencji będzie sprawniejsza. Dziękujemy za współpracę.{% endif %}
+<p>Zapoznaj się z aktami sprawy pod adresem http://porady.siecobywatelska.pl/{{target.case_get_absolute_url}}.</p>
+<p>Używaj adresu {{email}} do korespondencji w tej sprawie, dzięki temu wymiana korespondencji będzie sprawniejsza. Dziękujemy za współpracę.</p>

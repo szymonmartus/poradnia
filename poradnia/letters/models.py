@@ -1,28 +1,36 @@
 from __future__ import print_function, unicode_literals
 
+import logging
 import os
 from os.path import basename
 
 import claw
 import html2text
-from cases.models import Case
+from cached_property import cached_property
 from claw import quotations
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files import File
 from django.core.urlresolvers import reverse
 from django.db import models
+from django.db.models import Q
 from django.dispatch import receiver
 from django.utils.translation import ugettext_lazy as _
+from django_bleach.models import BleachField
 from django_mailbox.models import Message
 from django_mailbox.signals import message_received
+from djmail.template_mail import MagicMailBuilder
 from model_utils import Choices
 from model_utils.fields import MonitorField, StatusField
+
+from cases.models import Case
 from records.models import AbstractRecord, AbstractRecordQuerySet
-from template_mail.utils import send_tpl_email
+
 from .utils import date_random_path
 
 claw.init()
+
+logger = logging.getLogger(__name__)
 
 
 class LetterQuerySet(AbstractRecordQuerySet):
@@ -34,7 +42,7 @@ class LetterQuerySet(AbstractRecordQuerySet):
 
     def last_staff_send(self):
         return self.filter(status='done', created_by__is_staff=True).order_by(
-                '-created_on', '-id').all()[0]
+            '-created_on', '-id').all()[0]
 
     def last_received(self):
         return self.filter(created_by__is_staff=False).order_by('-created_on', '-id').all()[0]
@@ -54,10 +62,11 @@ class Letter(AbstractRecord):
     status_changed = MonitorField(monitor='status')
     accept = MonitorField(monitor='status', when=['done'], verbose_name=_("Accepted on"))
     name = models.CharField(max_length=250, verbose_name=_("Subject"))
-    text = models.TextField(verbose_name=_("Text"))
+    text = BleachField(verbose_name=_("Text"))
     signature = models.TextField(verbose_name=_("Signature"), blank=True, null=True)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name='letter_created_by', verbose_name=_("Created by"))
+    created_by = models.ForeignKey(to=settings.AUTH_USER_MODEL,
+                                   related_name='letter_created_by',
+                                   verbose_name=_("Created by"))
     created_on = models.DateTimeField(auto_now_add=True, verbose_name=_("Created on"))
     modified_by = models.ForeignKey(settings.AUTH_USER_MODEL,
                                     verbose_name=_("Modified by"),
@@ -78,20 +87,26 @@ class Letter(AbstractRecord):
     def __unicode__(self):
         return self.name
 
-    def get_users(self, force_all=False):
-        users_to_notify = self.get_users_with_perms()
+    @property
+    def internal(self):
+        return self.status == self.STATUS.staff
 
-        if self.status == self.STATUS.staff or force_all:
-            users_to_notify = users_to_notify.filter(is_staff=True)
+    @property
+    def client_visible(self):
+        return self.status == self.STATUS.done
 
-        return users_to_notify
+    @cached_property
+    def limit_visible_to(self):
+        if self.status == self.STATUS.staff:
+            return Q(is_staff=True)
+        return Q()
+
+    def get_users(self):
+        return self.case.get_users().filter(self.limit_visible_to)
 
     def get_absolute_url(self):
         case_url = self.record.case_get_absolute_url()
         return "%s#letter-%s" % (case_url, self.pk)
-
-    def is_done(self):
-        return (True if self.status == self.STATUS.done else False)
 
     def get_edit_url(self):
         return reverse('letters:edit', kwargs={'pk': self.pk})
@@ -103,13 +118,6 @@ class Letter(AbstractRecord):
         self.case = Case.objects.create(subject=self.name,
                                         created_by=self.created_by,
                                         client=self.client)
-
-    def send_notification(self, staff=None, *args, **kwargs):
-        if self.status is Letter.STATUS.done:
-            kwargs['staff'] = None
-        else:
-            kwargs['staff'] = True
-        return super(Letter, self).send_notification(*args, **kwargs)
 
     class Meta:
         verbose_name = _('Letter')
@@ -148,34 +156,38 @@ def mail_process(sender, message, **args):
     # Skip autoreply messages - see RFC3834
     if (lambda x: 'Auto-Submitted' in x and
             x['Auto-Submitted'] == 'auto-replied')(message.get_email_object()):
-        print("Delete .eml from {email} as auto-replied".format(email=message.from_address[0]))
+        logger.info("Delete .eml from %s as auto-replied", message.from_address[0])
         message.eml.delete(save=True)
         return
 
     # Identify user
-    user = get_user_model().objects.get_by_email_or_create(message.from_address[0])
-    print("Identified user: ", user)
+    actor = get_user_model().objects.get_by_email_or_create(message.from_address[0])
+    logger.debug("Identified user: %s", actor)
 
     # Identify case
     try:  # TODO: Is it old case?
         case = Case.objects.by_msg(message).get()
     except Case.DoesNotExist:
-        print("Case creating")
-        case = Case(name=message.subject, created_by=user, client=user)
-        case.save()
-        user.notify(actor=user, verb='registered', target=case, from_email=case.get_email())
-    print("Case: ", case)
+        logger.info("Case creating")
+        mails = MagicMailBuilder()
+        case = Case.objects.create(name=message.subject, created_by=actor, client=actor)
+        email = mails.case_new(actor, {"actor": actor,
+                                       "case": case,
+                                       "email": case.get_email()})
+        email.send()
+    logger.info("Case: %s", case)
     # Prepare text
-    if message.text:
-        text = quotations.extract_from(message.text, 'text/plain')
+    if message.html:
+        text = html2text.html2text(quotations.extract_from(message.html, 'text/html'))
         signature = message.text.replace(text, '')
     else:
-        text = html2text.html2text(quotations.extract_from(message.html, 'text/html'))
+        text = message.text.replace('\n', '<br />\n')
+        text = quotations.extract_from(text, 'text/plain')
         signature = message.text.replace(text, '')
 
     # Calculate letter status
-    if user.is_staff:
-        if user.has_perm('cases.can_send_to_client', case):
+    if actor.is_staff:
+        if actor.has_perm('cases.can_send_to_client', case):
             status = Letter.STATUS.done
         else:
             status = Letter.STATUS.staff
@@ -184,30 +196,29 @@ def mail_process(sender, message, **args):
 
     # Update case status (re-open)
     case_updated = False
-    if not user.is_staff and case.status == Case.STATUS.closed:
+    if not actor.is_staff and case.status == Case.STATUS.closed:
         case.status_update(reopen=True, save=False)
         case_updated = True
-    if user.is_staff:
+    if actor.is_staff:
         case.handled = True
         case_updated = True
-    if user.is_staff and status == Letter.STATUS.done:
+    if actor.is_staff and status == Letter.STATUS.done:
         case.has_project = False
         case_updated = True
 
     if case_updated:
         case.save()
 
-    obj = Letter(name=message.subject,
-                 created_by=user,
-                 case=case,
-                 status=status,
-                 text=text,
-                 message=message,
-                 signature=signature,
-                 eml=message.eml)
-    obj.save()
+    letter = Letter.objects.create(name=message.subject,
+                                   created_by=actor,
+                                   case=case,
+                                   status=status,
+                                   text=text,
+                                   message=message,
+                                   signature=signature,
+                                   eml=message.eml)
 
-    print("Letter: ", obj)
+    logger.info("Letter: %s", letter)
     # Convert attachments
     attachments = []
     for attachment in message.attachments.all():
@@ -217,8 +228,15 @@ def mail_process(sender, message, **args):
             ext = ext[:70]
             name = name[:70 - len(ext)] + ext
         att_file = File(attachment.document, name)
-        att = Attachment(letter=obj, attachment=att_file)
+        att = Attachment(letter=letter, attachment=att_file)
         attachments.append(att)
     Attachment.objects.bulk_create(attachments)
     case.update_counters()
-    obj.send_notification(actor=user, verb='created')
+
+    mails = MagicMailBuilder()
+    context = {'actor': actor,
+               'letter': letter,
+               'attachments': attachments,
+               'email': case.from_email}
+    for user in letter.get_users().exclude(pk=actor.pk):
+        mails.letter_created(user, context, from_email=case.get_email(actor)).send()

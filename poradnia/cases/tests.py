@@ -323,7 +323,7 @@ class CaseFormTestCase(TestCase):
                          instance=self.object)
         self.assertEqual(form.is_valid(), True)
         self.assertEqual(form.changed_data, ['name'])
-        self.assertEqual(len(form.changed_data_labels), 1)
+        self.assertEqual(len(form.changed_data_labels()), 1)
 
     def test_process_new(self):
         assign_perm('cases.can_close_case', self.staff, self.object)

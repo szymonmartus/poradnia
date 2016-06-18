@@ -15,7 +15,6 @@ from .models import Case, PermissionGroup
 class CaseForm(UserKwargModelFormMixin, FormHorizontalMixin, SingleButtonMixin,
                forms.ModelForm):
 
-    @property
     def changed_data_labels(self):
         return [self.fields[key].label for key in self.changed_data]
 
@@ -27,8 +26,8 @@ class CaseForm(UserKwargModelFormMixin, FormHorizontalMixin, SingleButtonMixin,
         mails = MagicMailBuilder()
         context = {"actor": self.user,
                    "case": self.instance,
-                   "changed_labels": self.changed_data_labels}
-        for user in self.instance.get_users({'is_staff': True}).all():
+                   "changed_labels": self.changed_data_labels()}
+        for user in self.instance.get_users().filter(is_staff=True).all():
             mails.case_new(user, context,
                            from_email=self.instance.get_email(self.user)).send()
 
@@ -40,8 +39,8 @@ class CaseForm(UserKwargModelFormMixin, FormHorizontalMixin, SingleButtonMixin,
         mails = MagicMailBuilder()
         context = {"actor": self.user,
                    "case": self.instance,
-                   "changed_labels": self.changed_data_labels}
-        for user in self.instance.get_users({'is_staff': True}).all():
+                   "changed_labels": self.changed_data_labels()}
+        for user in self.instance.get_users().filter(is_staff=True).all():
             mails.case_update(user, context,
                               from_email=self.instance.get_email(self.user)).send()
 

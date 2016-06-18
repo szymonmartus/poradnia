@@ -2,6 +2,7 @@ import autocomplete_light.shortcuts as autocomplete_light
 from atom.ext.crispy_forms.forms import HelperMixin, SingleButtonMixin
 from atom.ext.tinycontent.forms import GIODOMixin
 from atom.forms import PartialMixin
+from cases.models import Case
 from crispy_forms.layout import BaseInput, Submit
 from django import forms
 from django.contrib.auth import get_user_model
@@ -9,8 +10,7 @@ from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse
 from django.forms import ModelForm
 from django.utils.translation import ugettext_lazy as _
-
-from cases.models import Case
+from djmail.template_mail import MagicMailBuilder
 
 from .models import Attachment, Letter
 
@@ -107,18 +107,18 @@ class NewCaseForm(SingleButtonMixin, PartialMixin, GIODOMixin, autocomplete_ligh
         return self.user
 
     def get_case(self, client, user):
-        case = Case(name=self.cleaned_data['name'], created_by=user, client=client)
-        case.save()
-        return case
+        return Case.objects.create(name=self.cleaned_data['name'],
+                                   created_by=user,
+                                   client=client)
 
     def save(self, commit=True, *args, **kwargs):
         user = self.get_user()
         obj = super(NewCaseForm, self).save(commit=False, *args, **kwargs)
         obj.status = obj.STATUS.done
         obj.created_by = user
-        obj.client = self.get_client(user)
+        self.client = self.get_client(user)
         if not obj.case_id:
-            obj.case = self.get_case(client=obj.client, user=user)
+            obj.case = self.get_case(client=self.client, user=user)
         if commit:
             obj.save()
         return obj
@@ -133,12 +133,15 @@ class AddLetterForm(HelperMixin, PartialMixin, ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user')
         self.case = kwargs.pop('case')
+        self.notify = kwargs.pop('notify', True)
         self.user_can_send = self.user.has_perm('cases.can_send_to_client', self.case)
         super(AddLetterForm, self).__init__(*args, **kwargs)
         self.helper.form_action = reverse('letters:add', kwargs={'case_pk': self.case.pk})
         self.helper.form_tag = False
         self._add_buttons()
         self.fields['name'].initial = "Odp: %s" % (self.case)
+        self.instance.case = self.case
+        self.instance.created_by = self.user
 
     def _add_buttons(self):
         if self.user_can_send:
@@ -171,18 +174,15 @@ class AddLetterForm(HelperMixin, PartialMixin, ModelForm):
         if not self.user_can_send:
             return Letter.STATUS.staff
         if 'send_staff' in self.data or 'project' in self.data:
-                return Letter.STATUS.staff
+            return Letter.STATUS.staff
         return Letter.STATUS.done
 
-    def save(self, commit=True, *args, **kwargs):
-        obj = super(AddLetterForm, self).save(commit=False, *args, **kwargs)
-        obj.status = self.get_status()
-        obj.created_by = self.user
-        obj.case = self.case
+    def save(self, *args, **kwargs):
+        self.instance.status = self.get_status()
         if self.user.is_staff:
             if 'project' in self.data:
                 self.case.has_project = True
-            elif obj.status == Letter.STATUS.done:
+            elif self.instance.status == Letter.STATUS.done:
                 self.case.has_project = False
                 self.case.handled = True
         else:
@@ -190,9 +190,20 @@ class AddLetterForm(HelperMixin, PartialMixin, ModelForm):
             if self.case.status == Case.STATUS.closed:
                 self.case.status_update(reopen=True, save=False)
         self.case.save()
-        if commit:
-            obj.save()
-        return obj
+        super(AddLetterForm, self).save(*args, **kwargs)
+        if self.notify:
+            self.notification(self.instance)
+        return self.instance
+
+    def notification(self, obj, context=None):
+        # Update object
+        mails = MagicMailBuilder()
+        context = context or {}
+        context.update({"actor": self.user,
+                        "letter": self.instance})
+        for user in self.instance.case.get_users().filter(obj.limit_visible_to).all():
+            mails.letter_created(user, context,
+                                 from_email=self.case.get_email(self.user)).send()
 
     class Meta:
         fields = ['name', 'text']
@@ -209,26 +220,42 @@ class SendLetterForm(SingleButtonMixin, PartialMixin, ModelForm):
         ins = kwargs['instance']
         super(SendLetterForm, self).__init__(*args, **kwargs)
         self.helper.form_action = ins.get_send_url()
+        self.instance.modified_by = self.user
+        self.instance.status = Letter.STATUS.done
 
-    def save(self, commit=True, *args, **kwargs):
-        obj = super(SendLetterForm, self).save(commit=False, *args, **kwargs)
-        obj.modified_by = self.user
-        obj.status = obj.STATUS.done
-        obj.save()
+    def notification(self):  # TODO: Send a note with a letter to the appropriate users
+        mails = MagicMailBuilder()
+        context = {'actor': self.user,
+                   'letter': self.instance,
+                   'email': self.instance.case.from_email}
 
-        obj.case.handled = True
-        obj.case.has_project = False
-        obj.case.save()
+        for user in self.instance.case.get_users():
+            mails.letter_accepted(user, context,
+                                  from_email=self.instance.case.get_email(self.user)).send()
+        if self.note:
+            context = {'actor': self.user,
+                       'letter': self.note,
+                       'email': self.instance.case.from_email}
 
-        obj.send_notification(actor=self.user, verb='send_to_client')
+            for user in self.instance.get_users():
+                mails.letter_note(user, context,
+                                  from_email=self.instance.case.get_email(self.user)).send()
+
+    def _save_note(self):
         if self.cleaned_data['comment']:
-            msg = Letter(case=obj.case,
-                         created_by=self.user,
-                         text=self.cleaned_data['comment'],
-                         status=obj.STATUS.staff)
-            msg.save()
-            msg.send_notification(actor=self.user, verb='drop_a_note')
-        return obj
+            return Letter.objects.create(case=self.instance.case,
+                                         created_by=self.user,
+                                         text=self.cleaned_data['comment'],
+                                         status=Letter.STATUS.staff)
+
+    def save(self, *args, **kwargs):
+        self.instance.case.handled = True
+        self.instance.case.has_project = False
+        self.instance.case.save()
+        super(SendLetterForm, self).save(*args, **kwargs)
+        self.note = self._save_note()
+        self.notification()
+        return self.instance
 
     class Meta:
         model = Letter
@@ -248,11 +275,9 @@ class LetterForm(SingleButtonMixin, PartialMixin, ModelForm):  # eg. edit form
         self.helper.form_action = kwargs['instance'].get_edit_url()
         self.helper.form_method = 'post'
 
-    def save(self, commit=True, *args, **kwargs):
-        obj = super(LetterForm, self).save(commit=False, *args, **kwargs)
-        obj.modified_by = self.user
-        obj.save()
-        return obj
+    def save(self, *args, **kwargs):
+        self.instance.modified_by = self.user
+        return super(LetterForm, self).save(*args, **kwargs)
 
     class Meta:
         fields = ['name', 'text']

@@ -122,11 +122,8 @@ class Case(models.Model):
     def get_edit_url(self):
         return reverse('cases:edit', kwargs={'pk': str(self.pk)})
 
-    def get_users(self, filters=None, excludes=None):
-        qs = get_users_with_perms(self, with_group_users=False)
-        filters = filters or {}
-        excludes = excludes or {}
-        return qs.filter(**filters).exclude(**excludes)
+    def get_users(self):
+        return get_users_with_perms(self, with_group_users=False)
 
     def get_close_url(self):
         return reverse('cases:close', kwargs={'pk': str(self.pk)})
