@@ -51,6 +51,3 @@ MIDDLEWARE_CLASSES = (
 CACHES = {
     'default': env.cache(),
 }
-
-EMAIL_BACKEND = "djmail.backends.default.EmailBackend"
-DJMAIL_REAL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

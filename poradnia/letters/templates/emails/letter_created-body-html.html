@@ -1,3 +1,5 @@
+{% extends 'emails/_letter_base.html' %}
+{% block msg %}
 <p>{{actor}} napisał:</p>
 {{letter.text | safe}}
 
@@ -5,9 +7,9 @@
 <p>Załączniki pisma:</p>
 <ul>
 {% for att in attachments %}
-    <li>http://porady.siecobywatelska.pl/{{att.get_absolute_url}}</li>
+    <li><a href="http://porady.siecobywatelska.pl/{{att.get_absolute_url}}">{{att.filename}}</a></li>
 {% endfor %}
 </ul>
 {% endif %}
-<p>Zapoznaj się z aktami sprawy pod adresem http://porady.siecobywatelska.pl/{{target.case_get_absolute_url}}.</p>
-<p>Używaj adresu {{email}} do korespondencji w tej sprawie, dzięki temu wymiana korespondencji będzie sprawniejsza. Dziękujemy za współpracę.</p>
+{% endblock %}
+

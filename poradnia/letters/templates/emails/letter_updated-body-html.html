@@ -1,6 +1,5 @@
-{{actor}} zmienil pismo i napisał:
-{{letter.text}}
-
-Zapoznaj się z aktami sprawy pod adresem http://porady.siecobywatelska.pl/{{letter.get_absolute_url}}.
-
-{% if email %}Używaj adresu {{email}} do korespondencji w tej sprawie, dzięki temu wymiana korespondencji będzie sprawniejsza. Dziękujemy za współpracę.{% endif %}
+{% extends 'emails/_letter_base.html' %}
+{% block msg %}
+<p>{{actor}} zmienil pismo i napisał:</p>
+{{letter.text | safe}}
+{% endblock %}

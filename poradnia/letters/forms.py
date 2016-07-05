@@ -230,7 +230,7 @@ class SendLetterForm(SingleButtonMixin, PartialMixin, ModelForm):
                    'letter': self.instance,
                    'email': self.instance.case.from_email}
 
-        for user in self.instance.case.get_users_with_perms():
+        for user in self.instance.get_users_with_perms():
             mails.letter_accepted(user, context,
                                   from_email=self.instance.case.get_email(self.user)).send()
         if self.note:
@@ -238,7 +238,7 @@ class SendLetterForm(SingleButtonMixin, PartialMixin, ModelForm):
                        'letter': self.note,
                        'email': self.instance.case.from_email}
 
-            for user in self.instance.get_users_with_perms():
+            for user in self.instance.get_users_with_perms().filter(is_staff=True):
                 mails.letter_note(user, context,
                                   from_email=self.instance.case.get_email(self.user)).send()
 

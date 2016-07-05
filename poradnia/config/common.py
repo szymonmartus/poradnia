@@ -361,3 +361,8 @@ BLEACH_ALLOWED_TAGS = [
     'div',
 ]
 BLEACH_DEFAULT_WIDGET = 'tinymce.models.HTMLField'
+
+
+# djmail
+DJMAIL_REAL_BACKEND = EMAIL_BACKEND
+EMAIL_BACKEND = "djmail.backends.default.EmailBackend"

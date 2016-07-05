@@ -2,6 +2,8 @@ from os.path import splitext
 
 from django import template
 from django.template.defaultfilters import stringfilter
+from html2text import html2text as html2text_func
+
 
 register = template.Library()
 
@@ -70,3 +72,10 @@ def file2css(path):
         '.mp4': 'fa fa-video-o',
         '.webm': 'fa fa-video-o',
     }.get(ext, 'fa fa-file-o')
+
+
+@register.filter
+@stringfilter
+def html2text(path):
+    """Converts a HTML into Markdown"""
+    return html2text_func(path)
