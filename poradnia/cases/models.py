@@ -122,11 +122,11 @@ class Case(models.Model):
     def get_edit_url(self):
         return reverse('cases:edit', kwargs={'pk': str(self.pk)})
 
-    def get_users(self):
-        return get_users_with_perms(self, with_group_users=False)
-
     def get_close_url(self):
         return reverse('cases:close', kwargs={'pk': str(self.pk)})
+
+    def get_users_with_perms(self, *args, **kwargs):
+        return get_users_with_perms(self, with_group_users=False, *args, **kwargs)
 
     def __unicode__(self):
         return self.name
@@ -300,8 +300,7 @@ def notify_new_case(sender, instance, created, **kwargs):
         users = User.objects.filter(user_permissions__codename='can_view_all',
                                     user_permissions__content_type=content_type).all()
         for user in users:
-            email = mails.case_new(user, {'case': instance})
-            email.send()
+            mails.case_new(user, {'case': instance}).send()
 
 post_save.connect(notify_new_case, sender=Case, dispatch_uid="new_case_notify")
 

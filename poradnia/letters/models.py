@@ -6,7 +6,6 @@ from os.path import basename
 
 import claw
 import html2text
-from cached_property import cached_property
 from claw import quotations
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -42,7 +41,7 @@ class LetterQuerySet(AbstractRecordQuerySet):
 
     def last_staff_send(self):
         return self.filter(status='done', created_by__is_staff=True).order_by(
-            '-created_on', '-id').all()[0]
+                           '-created_on', '-id').all()[0]
 
     def last_received(self):
         return self.filter(created_by__is_staff=False).order_by('-created_on', '-id').all()[0]
@@ -95,14 +94,14 @@ class Letter(AbstractRecord):
     def client_visible(self):
         return self.status == self.STATUS.done
 
-    @cached_property
+    @property
     def limit_visible_to(self):
         if self.status == self.STATUS.staff:
             return Q(is_staff=True)
         return Q()
 
-    def get_users(self):
-        return self.case.get_users().filter(self.limit_visible_to)
+    def get_users_with_perms_with_perms(self):
+        return self.case.get_users_with_perms_with_perms().filter(self.limit_visible_to)
 
     def get_absolute_url(self):
         case_url = self.record.case_get_absolute_url()
@@ -160,6 +159,8 @@ def mail_process(sender, message, **args):
         message.eml.delete(save=True)
         return
 
+    mails = MagicMailBuilder()
+
     # Identify user
     actor = get_user_model().objects.get_by_email_or_create(message.from_address[0])
     logger.debug("Identified user: %s", actor)
@@ -169,7 +170,6 @@ def mail_process(sender, message, **args):
         case = Case.objects.by_msg(message).get()
     except Case.DoesNotExist:
         logger.info("Case creating")
-        mails = MagicMailBuilder()
         case = Case.objects.create(name=message.subject, created_by=actor, client=actor)
         email = mails.case_new(actor, {"actor": actor,
                                        "case": case,
@@ -233,10 +233,9 @@ def mail_process(sender, message, **args):
     Attachment.objects.bulk_create(attachments)
     case.update_counters()
 
-    mails = MagicMailBuilder()
     context = {'actor': actor,
                'letter': letter,
                'attachments': attachments,
                'email': case.from_email}
-    for user in letter.get_users().exclude(pk=actor.pk):
+    for user in letter.get_users_with_perms().exclude(pk=actor.pk):
         mails.letter_created(user, context, from_email=case.get_email(actor)).send()

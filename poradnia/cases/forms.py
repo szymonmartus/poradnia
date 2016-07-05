@@ -29,7 +29,7 @@ class CaseForm(UserKwargModelFormMixin, FormHorizontalMixin, SingleButtonMixin,
         context = {"actor": self.user,
                    "case": self.instance,
                    "changed_labels": self.changed_data_labels()}
-        for user in self.instance.get_users().filter(is_staff=True).all():
+        for user in self.instance.get_users_with_perms(is_staff=True).all():
             mails.case_new(user, context,
                            from_email=self.instance.get_email(self.user)).send()
 
@@ -42,7 +42,7 @@ class CaseForm(UserKwargModelFormMixin, FormHorizontalMixin, SingleButtonMixin,
         context = {"actor": self.user,
                    "case": self.instance,
                    "changed_labels": self.changed_data_labels()}
-        for user in self.instance.get_users().filter(is_staff=True).all():
+        for user in self.instance.get_users_with_perms(is_staff=True).all():
             mails.case_update(user, context,
                               from_email=self.instance.get_email(self.user)).send()
 
@@ -109,7 +109,7 @@ class CaseCloseForm(UserKwargModelFormMixin, HelperMixin, forms.ModelForm):
         if self.cleaned_data['notify']:
             mails = MagicMailBuilder()
             context = {"actor": self.user, 'case': self.instance}
-            for user in self.instance.get_users():
+            for user in self.instance.get_users_with_perms():
                 mails.case_close(user, context).send()
         return super(CaseCloseForm, self).save(*args, **kwargs)
 
