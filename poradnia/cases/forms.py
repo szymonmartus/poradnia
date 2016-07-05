@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
 import autocomplete_light.shortcuts as autocomplete_light
-from atom.ext.crispy_forms.forms import FormHorizontalMixin, HelperMixin, SingleButtonMixin
+from atom.ext.crispy_forms.forms import (FormHorizontalMixin, HelperMixin,
+                                         SingleButtonMixin)
 from braces.forms import UserKwargModelFormMixin
 from crispy_forms.layout import Submit
 from django import forms
 from django.contrib.auth import get_user_model
 from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext_lazy as _
-from guardian.shortcuts import assign_perm
 from djmail.template_mail import MagicMailBuilder
+from guardian.shortcuts import assign_perm
+
 from .models import Case, PermissionGroup
 
 

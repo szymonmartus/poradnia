@@ -1,5 +1,6 @@
-from atom.filters import CrispyFilterMixin
 import django_filters
+from atom.filters import CrispyFilterMixin
+
 from .models import Letter
 
 

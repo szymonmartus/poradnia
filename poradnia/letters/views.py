@@ -13,10 +13,11 @@ from django_filters.views import FilterView
 from djmail.template_mail import MagicMailBuilder
 from extra_views import (CreateWithInlinesView, InlineFormSet,
                          NamedFormsetsMixin, UpdateWithInlinesView)
+
 from cases.models import Case
 from users.utils import PermissionMixin
-from .filters import StaffLetterFilter, UserLetterFilter
 
+from .filters import StaffLetterFilter, UserLetterFilter
 from .forms import (AddLetterForm, AttachmentForm, LetterForm, NewCaseForm,
                     SendLetterForm)
 from .models import Attachment, Letter

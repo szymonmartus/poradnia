@@ -9,10 +9,10 @@ from django.utils.translation import ugettext as _
 from django.views.generic import FormView
 from django.views.generic.detail import SingleObjectMixin
 from djmail.template_mail import MagicMailBuilder
-
 from guardian.shortcuts import get_perms
 
-from users.forms import TranslatedManageObjectPermissionForm, TranslatedUserObjectPermissionsForm
+from users.forms import (TranslatedManageObjectPermissionForm,
+                         TranslatedUserObjectPermissionsForm)
 
 from ..forms import CaseGroupPermissionForm
 from ..models import Case

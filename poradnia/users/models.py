@@ -6,7 +6,7 @@ import re
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.urlresolvers import reverse
 from django.db import models
-from django.db.models import Q, Case, Count, IntegerField, When
+from django.db.models import Case, Count, IntegerField, Q, When
 from django.db.models.query import QuerySet
 from django.utils.translation import ugettext_lazy as _
 from djmail.template_mail import MagicMailBuilder

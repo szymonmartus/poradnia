@@ -1,4 +1,5 @@
 from django.test import TestCase
+
 from letters.factories import LetterFactory
 from records.models import Record
 

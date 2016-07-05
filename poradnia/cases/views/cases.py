@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
-from braces.views import LoginRequiredMixin, UserFormKwargsMixin, SelectRelatedMixin
+from braces.views import (LoginRequiredMixin, SelectRelatedMixin,
+                          UserFormKwargsMixin)
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.translation import ugettext as _
@@ -8,7 +9,7 @@ from django.views.generic import TemplateView, UpdateView
 from django_filters.views import FilterView
 
 from cases.filters import StaffCaseFilter, UserCaseFilter
-from cases.forms import CaseForm, CaseGroupPermissionForm, CaseCloseForm
+from cases.forms import CaseCloseForm, CaseForm, CaseGroupPermissionForm
 from cases.models import Case
 from events.forms import EventForm
 from letters.forms import AddLetterForm

@@ -1,7 +1,10 @@
 import datetime
 from datetime import timedelta
+from distutils.version import StrictVersion
+from email import message_from_file
 from os.path import dirname, join
 
+import django_mailbox
 from django.test import TestCase
 from django.utils.timezone import utc
 from django_mailbox.models import Mailbox
@@ -9,7 +12,6 @@ from guardian.shortcuts import assign_perm
 
 from cases.factories import CaseFactory
 from cases.models import Case
-from email import message_from_file
 from letters.factories import LetterFactory
 from letters.models import Letter, mail_process
 from users.factories import UserFactory
@@ -163,6 +165,9 @@ class ReceiveEmailTestCase(TestCase):
         self.assertEqual(case.status, Case.STATUS.assigned)
 
     def test_utf8_message(self):
+        if StrictVersion(django_mailbox.__version__) <= StrictVersion('4.5.3'):
+            self.skipTest("Django-mailbox is lower than required 4.5.3 " +
+                          "to UTF-8 filename attachment")
         case = CaseFactory(pk=639)
         message = self.get_message('utf8_message.eml')
         mail_process(sender=self.mailbox, message=message)
