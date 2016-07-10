@@ -1,0 +1,8 @@
+{% extends 'emails/_base-body-text.html' %}
+{% block content %}
+{% block msg %}
+{% endblock %}
+Zapoznaj się z aktami sprawy pod adresem http://porady.siecobywatelska.pl{{case.get_absolute_url}} .
+
+Prosimy, używaj adresu {{case.get_email}} do korespondencji w tej sprawie. Dzięki temu wymiana korespondencji będzie sprawniejsza. Dziękujemy za współpracę.
+{% endblock %}

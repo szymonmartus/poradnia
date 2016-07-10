@@ -1,5 +1,5 @@
-{% extends 'emails/_letter_base.html' %}
+{% extends 'emails/_letter_base-body-html.html' %}
 {% block msg %}
-<p>{{actor}} zmienil pismo i napisał:</p>
+<p>{{actor}} zmienił pismo i napisał:</p>
 {{letter.text | safe}}
 {% endblock %}

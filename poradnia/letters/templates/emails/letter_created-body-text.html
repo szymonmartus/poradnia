@@ -1,0 +1,14 @@
+{% extends 'emails/_letter_base-body-text.html' %}
+{% load letter_tags %}
+{% block msg %}
+{{actor}} napisał:
+
+{{letter.text | html2text}}
+
+{% if attachments %}
+Załączniki pisma:
+{% for att in attachments %}- http://porady.siecobywatelska.pl/{{att.get_absolute_url}}
+{% endfor %}
+{% endif %}
+{% endblock %}
+

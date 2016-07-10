@@ -1,0 +1,7 @@
+{% extends 'emails/_letter_base-body-text.html' %}
+{% load letter_tags %}
+{% block msg %}
+{{ actor }} pozostawił notatkę:
+
+{{ letter.text | html2text }}
+{% endblock %}

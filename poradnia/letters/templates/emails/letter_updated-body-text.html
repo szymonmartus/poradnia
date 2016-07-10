@@ -1,0 +1,8 @@
+{% extends 'emails/_letter_base-body-text.html' %}
+{% load letter_tags %}
+
+{% block msg %}
+{{actor}} zmienił pismo i napisał:
+
+{{letter.text | html2text}}
+{% endblock %}
