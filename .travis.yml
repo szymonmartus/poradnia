@@ -16,10 +16,14 @@ env:
     - TOX_ENV=docs
     - TOX_ENV=dj110-coveralls
     - TOX_ENV=dj111-coveralls
+    - TOX_ENV=dj20-coveralls
+    - TOX_ENV=djmaster
 
 matrix:
   allow_failures:
     - env: TOX_ENV=flake8
+    - env: TOX_ENV=dj20-coveralls
+    - env: TOX_ENV=djmaster
 
 install:
   - pip install -U pip wheel
