@@ -172,3 +172,11 @@ class ReceiveEmailTestCase(TestCase):
 
         case.refresh_from_db()
         self.assertEqual(case.status, Case.STATUS.free)
+
+    def test_surrogates_message(self):
+        case = CaseFactory(pk=1418)
+        message = self.get_message('surrogates_message.eml')
+        MessageParser.receive_signal(sender=self.mailbox, message=message)
+        case.refresh_from_db()
+        self.assertEqual(case.status, Case.STATUS.free)
+
