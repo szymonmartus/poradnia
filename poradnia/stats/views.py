@@ -1,8 +1,8 @@
-import csv
-import json
 from collections import OrderedDict
+import csv
 from datetime import datetime
 from itertools import dropwhile, takewhile
+import json
 
 from braces.views import (JSONResponseMixin, LoginRequiredMixin,
                           SuperuserRequiredMixin)
@@ -21,7 +21,6 @@ from poradnia.cases.models import Case as CaseModel
 from poradnia.letters.models import Letter as LetterModel
 from poradnia.stats.models import Graph, Item, Value
 from poradnia.users.models import User as UserModel
-
 from .utils import DATE_FORMAT_MONTHLY, GapFiller, SECONDS_IN_A_DAY, raise_unless_unauthenticated
 
 

@@ -10,7 +10,6 @@ import django_filters
 from django_filters.views import FilterView
 
 from poradnia.users.utils import PermissionMixin
-
 from .fbv import REGISTRATION_TEXT
 from ..forms import AttachmentForm, LetterForm, NewCaseForm
 from ..models import Attachment, Letter

@@ -1,11 +1,11 @@
-from django.utils import six
-import unicodecsv as csv
 from datetime import datetime, timedelta
 from time import strptime
 
-import requests
 from lxml import html
+from django.utils import six
 from pytz import timezone
+import requests
+import unicodecsv as csv
 
 from poradnia.judgements.models import SessionRow
 from poradnia.judgements.parsers.base import BaseParser

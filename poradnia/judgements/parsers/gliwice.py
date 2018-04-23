@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-import logging
 from datetime import datetime
+import logging
 from time import strptime
 
-import requests
-import six
 from django.utils.six import text_type
 from lxml import html
+import requests
+import six
 
 from poradnia.judgements.models import SessionRow
 from poradnia.judgements.parsers.base import BaseParser

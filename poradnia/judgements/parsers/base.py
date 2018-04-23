@@ -1,6 +1,6 @@
+from datetime import datetime
 import logging
 import re
-from datetime import datetime
 from time import strptime
 
 from django.utils.six import text_type

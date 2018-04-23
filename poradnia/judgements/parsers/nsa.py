@@ -1,12 +1,12 @@
 from datetime import datetime
 from time import strptime
 
-import requests
 from lxml import html
 from pytz import timezone
+import requests
 
-from ..models import SessionRow
 from .base import BaseParser
+from ..models import SessionRow
 from ..registry import register_parser
 
 

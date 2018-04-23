@@ -5,7 +5,6 @@ from django.utils.translation import ugettext_lazy as _
 import django_filters
 
 from poradnia.users.filters import UserChoiceFilter
-
 from .models import Advice
 
 

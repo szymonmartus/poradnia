@@ -4,7 +4,6 @@ from atom.forms import AuthorMixin
 from django import forms
 
 from poradnia.letters.forms import PartialMixin
-
 from .models import Event
 
 try:

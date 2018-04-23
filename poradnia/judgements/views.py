@@ -6,9 +6,8 @@ from braces.views import UserFormKwargsMixin, FormValidMessageMixin
 from cached_property import cached_property
 from django import forms
 from django.shortcuts import get_object_or_404
-from django.utils.translation import ugettext as _
-
 from django.urls import reverse_lazy, reverse
+from django.utils.translation import ugettext as _
 from django.views.generic import CreateView, UpdateView, DeleteView
 
 from poradnia.cases.models import Case

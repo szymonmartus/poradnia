@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.core.management import BaseCommand
 from django.utils import timezone
 from django.utils.six import text_type
+
 from poradnia.events.models import Reminder, Event
 
 

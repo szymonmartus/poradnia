@@ -2,11 +2,12 @@ from __future__ import unicode_literals
 
 import logging
 import os
-from django.contrib.sites.shortcuts import get_current_site
 from os.path import basename
+
 from cached_property import cached_property
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.sites.shortcuts import get_current_site
 from django.core.files import File
 from django.db import models
 from django.db.models import F, Func, IntegerField, Q
@@ -23,7 +24,6 @@ from poradnia.cases.models import Case
 from poradnia.cases.utils import get_users_with_perm
 from poradnia.records.models import AbstractRecord, AbstractRecordQuerySet
 from poradnia.users.models import User
-
 from .utils import date_random_path
 
 try:

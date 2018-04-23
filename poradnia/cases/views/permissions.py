@@ -12,7 +12,6 @@ from guardian.shortcuts import get_perms
 from poradnia.users.forms import (TranslatedManageObjectPermissionForm,
                                   TranslatedUserObjectPermissionsForm)
 from poradnia.users.models import User
-
 from ..forms import CaseGroupPermissionForm
 from ..models import Case, CaseUserObjectPermission
 

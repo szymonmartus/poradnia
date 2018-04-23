@@ -1,8 +1,8 @@
 import string
 
-import factory.fuzzy
 from django.utils import six
 from django.utils.six import binary_type
+import factory.fuzzy
 
 
 polish_letters = string.ascii_letters

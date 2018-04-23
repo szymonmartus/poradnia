@@ -1,7 +1,7 @@
 import datetime
 
-import factory.fuzzy
 from django.utils.timezone import now
+import factory.fuzzy
 
 from poradnia.cases.factories import CaseFactory
 from poradnia.events.factories import EventFactory

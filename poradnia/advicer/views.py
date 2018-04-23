@@ -8,7 +8,6 @@ from django.views.generic import CreateView, DetailView, UpdateView
 from django_filters.views import FilterView
 
 from poradnia.users.utils import PermissionMixin
-
 from .filters import AdviceFilter
 from .forms import AdviceForm, AttachmentForm
 from .models import Advice, Attachment

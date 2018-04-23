@@ -2,11 +2,9 @@ import collections
 
 from django.conf import settings
 from django.db import models
-
-# Create your models here.
 from django.utils.encoding import python_2_unicode_compatible
-from model_utils.models import TimeStampedModel
 from django.utils.translation import ugettext_lazy as _
+from model_utils.models import TimeStampedModel
 
 from poradnia.events.models import Event
 from poradnia.judgements.registry import parser_registry

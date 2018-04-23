@@ -1,6 +1,6 @@
 import factory
-import factory.fuzzy
 from factory.django import ImageField
+import factory.fuzzy
 
 from poradnia.cases.factories import CaseFactory
 from poradnia.users.factories import UserFactory
