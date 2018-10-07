@@ -216,7 +216,10 @@ class MessageParser(object):
             case = Case.objects.create(name=self.message.subject,
                                        created_by=self.actor,
                                        client=self.actor)
-            self.actor.notify(actor=self.actor, verb='registered', target=case, from_email=case.get_email())
+            self.actor.notify(actor=self.actor,
+                              verb='registered',
+                              target=case,
+                              from_email=case.get_email())
         return case
 
     @cached_property

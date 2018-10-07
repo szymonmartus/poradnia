@@ -62,3 +62,5 @@ MIDDLEWARE_CLASSES = (
     'elasticapm.contrib.django.middleware.TracingMiddleware',
 ) + MIDDLEWARE_CLASSES
 
+
+LETTER_RECEIVE_SECRET = env.str('LETTER_RECEIVE_SECRET')
